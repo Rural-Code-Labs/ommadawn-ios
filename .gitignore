@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Xcode — datos de usuario (no se versionan)
+xcuserdata/
+*.xcuserstate
+
+# Build
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# CocoaPods / Carthage (por si acaso en el futuro)
+Pods/
+Carthage/Build/
+
+# Otros
+*.xccheckout
+*.xcscmblueprint
+timeline.xctimeline
+playground.xcworkspace
