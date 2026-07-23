@@ -33,12 +33,14 @@ el futuro con otra base de código.
   *Rural-Code-Labs*, la misma que la API, no la cuenta personal). Carpeta local:
   `~/development/swift/ommadawn`. El repo va con sufijo **`-ios`** (habrá un futuro
   cliente Android aparte); la carpeta y el target Xcode se llaman `ommadawn`.
-- **Estado**: **scaffold recién creado** (plantilla por defecto de Xcode). `ContentView`
-  es todavía el "Hello, world!" del template. No hay capa de red ni pantallas propias.
+- **Estado**: **Fase 2 hecha** — capa de red operativa. Hay un paquete Swift local
+  `OmmadawnAPI` con el cliente generado desde `openapi.json`, enchufado a la app y probado
+  con una llamada real a `GET /health` (badge "API conectada" en el login). Falta pulir la
+  UI del login (placeholder) y toda la lógica de auth.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (iOS/macOS/visionOS),
   Swift 5, Xcode 26.
-- **Siguiente paso**: **Fase 2 — capa de red** (integrar `swift-openapi-generator` con el
-  `openapi.json` de la API). Ver plan por fases abajo.
+- **Siguiente paso**: **Fase 3 — autenticación** (registro/login, tokens en Keychain,
+  refresh + reintento). Ver plan por fases abajo.
 
 ---
 
@@ -70,6 +72,25 @@ partir del `openapi.json`, en vez de escribir modelos `Codable` y llamadas a man
 - Los tipos de request/response **siempre coinciden** con la API.
 - Un cambio que rompa el contrato **se detecta al compilar**.
 - Al regenerar (cuando cambie la API), no re-escribir a mano el código generado.
+
+**Cómo está montado (Fase 2):**
+
+- La capa de red vive en un **paquete Swift local aparte**, `OmmadawnAPI/` (no en el target
+  de la app). Contiene `Package.swift`, el contrato **vendorizado** `openapi.json`, la config
+  `openapi-generator-config.yaml` (`generate: [types, client]`, `accessModifier: public`) y el
+  poco código a mano: `APIClient.swift` (`APIEnvironment` + `Client(environment:)`).
+- El código del cliente se genera con el **build plugin** en cada compilación (no se comitea).
+  Transporte: `swift-openapi-urlsession`. `.build/` y `.swiftpm/` están en `.gitignore`.
+- **Regenerar tras un cambio en la API**: `curl -s http://127.0.0.1:8000/openapi.json -o
+  OmmadawnAPI/Sources/OmmadawnAPI/openapi.json` y recompilar. El contrato es un snapshot: se
+  refresca a mano cuando la API cambia.
+- **`serverURL` = solo origen** (`http://127.0.0.1:8000`): las rutas del contrato ya incluyen
+  `/api/v1/...`, así que **no** se pone el prefijo en la base URL.
+- **Primera compilación en Xcode**: pide confiar en el plugin (`OpenAPIGenerator` →
+  "Trust & Enable"). Por CLI se usa `xcodebuild ... -skipPackagePluginValidation`.
+- El paquete local está cableado a mano en el `.xcodeproj` (referencia local + dependencia de
+  producto en el target `ommadawn`). Simulador de referencia: `iPhone 17` (en Xcode 26 ya no
+  existe `iPhone 16`).
 
 ### Autenticación — reglas que la app debe cumplir
 
@@ -113,10 +134,10 @@ de tiempo.
 open ommadawn.xcodeproj
 
 # Build (simulador iOS)
-xcodebuild -scheme ommadawn -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -scheme ommadawn -destination 'platform=iOS Simulator,name=iPhone 17' build
 
 # Tests
-xcodebuild -scheme ommadawn -destination 'platform=iOS Simulator,name=iPhone 16' test
+xcodebuild -scheme ommadawn -destination 'platform=iOS Simulator,name=iPhone 17' test
 ```
 
 Para trabajar contra la API en local, levantarla en `~/development/python/ommadawn-api`
@@ -202,8 +223,8 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | Fase | Contenido | Estado |
 |---|---|---|
 | **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca (plantilla). | ✅ Hecha |
-| **2 — Capa de red** | Integrar `swift-openapi-generator` con `openapi.json`, cliente base, config de base URL por entorno. | ⏭️ Siguiente |
-| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática con refresh + reintento. | Pendiente |
+| **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
+| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática con refresh + reintento. | ⏭️ Siguiente |
 | **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | Pendiente |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |

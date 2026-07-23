@@ -1,0 +1,18 @@
+# Configuración del build plugin de swift-openapi-generator.
+#
+# El plugin busca en este directorio:
+#   - el contrato:  openapi.json  (o .yaml)
+#   - esta config:  openapi-generator-config.yaml
+#
+# Docs: https://swiftpackageindex.com/apple/swift-openapi-generator/documentation
+
+# Qué generar:
+#   - types:  los modelos (UserRead, TokenPair, LoginRequest, …)
+#   - client: el struct `Client` que hace las peticiones HTTP
+# NO generamos `server` (eso es cosa de la API en Python).
+generate:
+  - types
+  - client
+
+# `public` para que la app (otro módulo) pueda importar y usar lo generado.
+accessModifier: public
