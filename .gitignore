@@ -22,6 +22,10 @@ DerivedData/
 Pods/
 Carthage/Build/
 
+# Claude Code — skills de terceros (licencia PolyForm, no redistribuir en repo público).
+# Se reinstalan en local; ver CLAUDE.md > "Skills de Swift/iOS".
+.claude/skills/
+
 # Otros
 *.xccheckout
 *.xcscmblueprint

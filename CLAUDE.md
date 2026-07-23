@@ -128,6 +128,72 @@ comprobar `http://localhost:8000/docs`.
 
 ---
 
+## Skills de Swift/iOS (solo este proyecto)
+
+En `.claude/skills/` hay un **subconjunto curado** de skills de especialización en
+Swift/iOS, instaladas **solo en este repo** (no en la config global). Se activan solas por
+su `description` cuando la tarea encaja, y el cuerpo/`references` solo se cargan al usarse.
+Apuntan a **iOS 26+ / Swift 6.x** (compatibles hacia atrás salvo que se indique), que es el
+target del proyecto.
+
+> ⚠️ **No están versionadas.** `.claude/skills/` está en `.gitignore`: este repo es
+> **público** y las skills tienen licencia PolyForm Perimeter (source-available, no
+> redistribuir). Viven solo en local; hay que **reinstalarlas** al clonar el repo o
+> montar el proyecto desde cero (ver *Reinstalar* al final de esta sección).
+
+Instaladas (16), elegidas para un **cliente REST en SwiftUI**:
+
+| Skill | Para qué |
+|---|---|
+| `ios-networking` | URLSession async/await, cliente de API, reintentos, WebSocket |
+| `swift-concurrency` | `async/await`, actores, `Sendable`, Swift 6 concurrency |
+| `swift-codable` | (De)codificación JSON, estrategias de claves |
+| `swift-security` | Keychain, almacenamiento de tokens/secretos (clave para auth) |
+| `authentication` | OAuth, passkeys, flujos de login |
+| `swiftui-navigation` | NavigationStack/SplitView, sheets, tabs, deep links |
+| `swiftui-patterns` | Observation, arquitectura de vistas, ownership |
+| `swiftui-layout-components` | Listas, scroll, componentes de layout |
+| `swiftui-performance` | Rendimiento de listas/feeds, Instruments |
+| `swiftui-liquid-glass` | Diseño Liquid Glass de iOS 26 |
+| `swift-architecture` | Selección de patrón, migración a Observation |
+| `swift-language` | Refactors modernos, interoperabilidad |
+| `swift-api-design-guidelines` | Nombrado y diseño de API idiomático |
+| `swift-formatstyle` | Formateo/parseo de fechas, números, localización |
+| `swift-testing` | Framework Swift Testing (`@Test`, `#expect`) |
+| `ios-simulator` | Arrancar/gestionar el simulador, rutas, push, privacidad |
+
+- **Origen**: [`dpearson2699/swift-ios-skills`](https://github.com/dpearson2699/swift-ios-skills)
+  (el repo trae ~86 skills, una por framework de Apple). Se copiaron solo `SKILL.md` +
+  `references/` de las relevantes (sin `evals/`).
+- **Licencia**: PolyForm Perimeter License 1.0.0 (© 2025 dpearson2699) — source-available
+  con restricciones. Por eso **no se suben** a este repo público.
+- **Añadir más**: copiar la carpeta de la skill deseada desde ese repo a `.claude/skills/`.
+
+### Reinstalar (proyecto desde cero / nuevo clon)
+
+Como no están en git, hay que volver a instalarlas en local. Desde la raíz del repo:
+
+```bash
+git clone --depth 1 https://github.com/dpearson2699/swift-ios-skills.git /tmp/swift-ios-skills
+mkdir -p .claude/skills
+for s in ios-networking swift-concurrency swift-codable swift-security \
+         swiftui-navigation swiftui-patterns swiftui-layout-components swiftui-performance \
+         swift-architecture swift-testing swiftui-liquid-glass swift-formatstyle \
+         authentication swift-language swift-api-design-guidelines ios-simulator; do
+  mkdir -p ".claude/skills/$s"
+  cp "/tmp/swift-ios-skills/skills/$s/SKILL.md" ".claude/skills/$s/"
+  [ -d "/tmp/swift-ios-skills/skills/$s/references" ] && \
+    cp -R "/tmp/swift-ios-skills/skills/$s/references" ".claude/skills/$s/"
+done
+rm -rf /tmp/swift-ios-skills
+```
+
+Tras instalarlas, **reiniciar la sesión** de Claude Code para que las detecte. Ojo con el
+word-splitting: el bucle de arriba asume `bash`; en `zsh` interactivo funciona igual porque
+la lista va explícita en el `for` (no en una variable).
+
+---
+
 ## Plan por fases
 
 Fases **pequeñas y entendibles**; cada una se cierra antes de la siguiente. La app va por
