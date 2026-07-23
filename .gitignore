@@ -17,6 +17,9 @@ DerivedData/
 # Swift Package Manager
 .build/
 .swiftpm/
+# El lockfile del paquete local lo posee el proyecto de la app (workspace de
+# Xcode), no el subpaquete. Evita dos Package.resolved que puedan divergir.
+OmmadawnAPI/Package.resolved
 
 # CocoaPods / Carthage (por si acaso en el futuro)
 Pods/
