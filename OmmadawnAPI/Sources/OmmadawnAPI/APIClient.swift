@@ -41,7 +41,27 @@ public extension Client {
     init(environment: APIEnvironment = .development) {
         self.init(
             serverURL: environment.baseURL,
+            configuration: .ommadawn,
             transport: URLSessionTransport()
+        )
+    }
+
+    /// Cliente **autenticado**: añade el token a las peticiones protegidas y
+    /// renueva la sesión automáticamente ante un `401`.
+    ///
+    /// - Important: créalo **una sola vez** y compártelo. Cada instancia
+    ///   coordina sus propias renovaciones, así que tener varias reintroduce
+    ///   justo la carrera que el `TokenRefresher` evita.
+    static func authenticated(
+        environment: APIEnvironment = .development,
+        refresher: TokenRefresher? = nil
+    ) -> Client {
+        let refresher = refresher ?? TokenRefresher(environment: environment)
+        return Client(
+            serverURL: environment.baseURL,
+            configuration: .ommadawn,
+            transport: URLSessionTransport(),
+            middlewares: [AuthMiddleware(refresher: refresher)]
         )
     }
 }

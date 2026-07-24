@@ -31,6 +31,9 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.0.0"),
         // Transporte HTTP sobre URLSession (nativo de Apple).
         .package(url: "https://github.com/apple/swift-openapi-urlsession", from: "1.0.0"),
+        // Tipos HTTP (HTTPRequest/HTTPResponse) que usa el middleware de auth.
+        // Se declara explícitamente en vez de depender del import transitivo.
+        .package(url: "https://github.com/apple/swift-http-types", from: "1.0.0"),
     ],
     targets: [
         .target(
@@ -38,6 +41,7 @@ let package = Package(
             dependencies: [
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
+                .product(name: "HTTPTypes", package: "swift-http-types"),
             ],
             plugins: [
                 // Al compilar, este plugin lee openapi.json + la config y
