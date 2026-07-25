@@ -33,14 +33,14 @@ el futuro con otra base de código.
   *Rural-Code-Labs*, la misma que la API, no la cuenta personal). Carpeta local:
   `~/development/swift/ommadawn`. El repo va con sufijo **`-ios`** (habrá un futuro
   cliente Android aparte); la carpeta y el target Xcode se llaman `ommadawn`.
-- **Estado**: **Fase 2 hecha** — capa de red operativa. Hay un paquete Swift local
-  `OmmadawnAPI` con el cliente generado desde `openapi.json`, enchufado a la app y probado
-  con una llamada real a `GET /health` (badge "API conectada" en el login). Falta pulir la
-  UI del login (placeholder) y toda la lógica de auth.
+- **Estado**: **Fase 3 hecha** — autenticación completa y funcional: registro, login (por
+  `username_or_email`), sesión persistente en Keychain, renovación automática ante `401` y
+  logout. Sobre la capa de red de la Fase 2 (`OmmadawnAPI`, cliente generado desde
+  `openapi.json`).
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (iOS/macOS/visionOS),
   Swift 5, Xcode 26.
-- **Siguiente paso**: **Fase 3 — autenticación** (registro/login, tokens en Keychain,
-  refresh + reintento). Ver plan por fases abajo.
+- **Siguiente paso**: **Fase 4 — discografía**, pero está **bloqueada**: la API aún no la
+  expone (va por su Fase 5). Hasta entonces, solo cabe pulir la app actual. Ver plan abajo.
 
 ---
 
@@ -104,6 +104,28 @@ rotación)**. Implicaciones para la app:
 - Tokens en el **Keychain**, nunca en `UserDefaults`.
 - `logout` (`POST /api/v1/auth/logout`) revoca el refresh token en el servidor.
 - Endpoints de auth: `register`, `login`, `refresh`, `logout`, `me`.
+
+### Cómo está montada (Fase 3)
+
+- **`TokenStore`** (`OmmadawnAPI`, actor): guarda el par de tokens en **un solo item** del
+  Keychain (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`). Un item porque el refresh rota
+  y hay que actualizarlo de forma atómica. Logout borra todo por `service`.
+- **`AuthMiddleware`** (`OmmadawnAPI`): inyecta `Authorization: Bearer` y, ante un `401`,
+  renueva y **reintenta una vez**. Lista de **exclusión** (health/login/register/refresh);
+  todo lo demás va protegido por defecto. `TokenRefresher` (actor) coordina las renovaciones
+  con *single-flight* (la API rota el refresh; dos renovaciones a la vez lo invalidarían).
+- **`AuthSession`** (app, `@Observable @MainActor`): dueño único del cliente autenticado y del
+  refresher. Estado `loading/signedOut/signedIn(User)`; `ContentView` enruta según él.
+  Expone `restore` (arranque), `logIn`, `register` (con auto-login) y `logOut`.
+- **Logout**: cierra en local **primero** (Keychain + estado, sin red) y revoca en el
+  servidor en segundo plano *best-effort*. Las acciones del usuario no esperan a la red.
+- **Fechas**: `DateTranscoder` propio porque la API (Python) emite microsegundos, que el
+  decodificador ISO8601 por defecto rechaza.
+
+> ⚠️ **`full_name` no existe en el modelo generado.** El generador descarta el `anyOf` con
+> `null` que emite Pydantic para los opcionales. Si se necesita, se arregla del lado de la
+> API (declarar los opcionales de forma que el generador los entienda). Lo mismo podría
+> pasar con futuros campos opcionales.
 
 ---
 
@@ -224,8 +246,8 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 |---|---|---|
 | **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
-| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática con refresh + reintento. | ⏭️ Siguiente |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | Pendiente |
+| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática con refresh + reintento. | ✅ Hecha |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | ⛔ Bloqueada (la API aún no la expone) |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |
