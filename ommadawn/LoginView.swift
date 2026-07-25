@@ -2,31 +2,32 @@
 //  LoginView.swift
 //  ommadawn
 //
-//  Pantalla de inicio de sesión.
+//  Pantalla de inicio de sesión. Recoge credenciales y delega en
+//  `AuthSession` el trabajo real (red, tokens, Keychain).
 //
-//  ⚠️ De momento es SOLO UI: no hay capa de red ni autenticación real.
-//  El botón "Entrar" simula una espera y no habla con la API. La lógica
-//  de verdad (tokens, Keychain, refresh) llega en la Fase 3.
+//  Al iniciar sesión con éxito, `AuthSession` cambia de estado y la vista
+//  raíz (ContentView) enruta fuera de aquí sola: esta pantalla no navega.
 //
 
 import SwiftUI
 
 struct LoginView: View {
-    // El estado del formulario es LOCAL a la vista → @State.
-    // Lo que el usuario teclea no le interesa a nadie más todavía.
-    @State private var email = ""
-    @State private var password = ""
+    @Environment(AuthSession.self) private var session
 
-    // UX: alternar entre ocultar/mostrar la contraseña.
+    // Estado del formulario: local a la vista.
+    // La API acepta username O email en el mismo campo (`username_or_email`).
+    @State private var usernameOrEmail = ""
+    @State private var password = ""
     @State private var isPasswordVisible = false
 
-    // Simula la espera de una petición de red (placeholder de la Fase 3).
     @State private var isSubmitting = false
+    /// Mensaje de error a mostrar bajo el formulario (nil = sin error).
+    @State private var errorMessage: String?
 
-    // Validación mínima en cliente para habilitar el botón.
-    // No valida "de verdad" el email: solo evita mandar formularios vacíos.
+    /// Solo evita enviar formularios vacíos. La validación de verdad
+    /// (credenciales correctas) la hace el servidor.
     private var isFormValid: Bool {
-        email.contains("@") && !password.isEmpty
+        !usernameOrEmail.isEmpty && !password.isEmpty
     }
 
     var body: some View {
@@ -34,8 +35,15 @@ struct LoginView: View {
             header
 
             VStack(spacing: 16) {
-                emailField
+                identifierField
                 passwordField
+                if let errorMessage {
+                    Text(errorMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity)
+                }
             }
 
             loginButton
@@ -45,6 +53,8 @@ struct LoginView: View {
         .padding(.horizontal, 24)
         .frame(maxWidth: 420) // en iPad/Mac no queremos campos gigantes
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .disabled(isSubmitting)
+        .animation(.default, value: errorMessage)
     }
 
     // MARK: - Secciones
@@ -65,15 +75,15 @@ struct LoginView: View {
         }
     }
 
-    private var emailField: some View {
-        TextField("Email", text: $email)
-            .textContentType(.emailAddress)
+    private var identifierField: some View {
+        TextField("Usuario o email", text: $usernameOrEmail)
+            .textContentType(.username)
             .autocorrectionDisabled()
             #if os(iOS)
-            .keyboardType(.emailAddress)
             .textInputAutocapitalization(.never)
             #endif
             .textFieldStyle(.roundedBorder)
+            .onChange(of: usernameOrEmail) { errorMessage = nil }
     }
 
     private var passwordField: some View {
@@ -90,6 +100,8 @@ struct LoginView: View {
             #if os(iOS)
             .textInputAutocapitalization(.never)
             #endif
+            .onChange(of: password) { errorMessage = nil }
+            .onSubmit { Task { await submit() } }
 
             Button {
                 isPasswordVisible.toggle()
@@ -126,7 +138,7 @@ struct LoginView: View {
             Text("¿No tienes cuenta?")
                 .foregroundStyle(.secondary)
             Button("Crear una") {
-                // TODO: Fase 3 — navegar a la pantalla de registro.
+                // TODO: paso 3.5 — navegar a la pantalla de registro.
             }
         }
         .font(.footnote)
@@ -134,17 +146,42 @@ struct LoginView: View {
 
     // MARK: - Acciones
 
-    /// Placeholder: simula la latencia de un login real.
-    /// En la Fase 3 esto llamará a `POST /api/v1/auth/login` y guardará
-    /// los tokens en el Keychain.
+    /// Inicia sesión a través de `AuthSession`. En caso de éxito no hay que
+    /// hacer nada más: el enrutado por estado nos saca de esta pantalla.
     private func submit() async {
+        guard isFormValid, !isSubmitting else { return }
+        errorMessage = nil
         isSubmitting = true
         defer { isSubmitting = false }
-        try? await Task.sleep(for: .seconds(1))
-        // De momento no hace nada más.
+
+        do {
+            try await session.logIn(usernameOrEmail: usernameOrEmail, password: password)
+        } catch let error as LoginError {
+            errorMessage = message(for: error)
+        } catch {
+            errorMessage = "Algo salió mal. Inténtalo de nuevo."
+        }
+    }
+
+    /// Traduce el error del modelo a un texto para la persona usuaria.
+    /// (La UI es la dueña de estas cadenas, no `AuthSession`.)
+    private func message(for error: LoginError) -> String {
+        switch error {
+        case .invalidCredentials:
+            "Usuario o contraseña incorrectos."
+        case .accountDisabled:
+            "Tu cuenta está desactivada."
+        case .invalidData:
+            "Revisa los datos introducidos."
+        case .unexpected(let statusCode):
+            "Error del servidor (\(statusCode)). Inténtalo más tarde."
+        case .network:
+            "No se pudo conectar. Comprueba tu conexión."
+        }
     }
 }
 
 #Preview {
     LoginView()
+        .environment(AuthSession(initialState: .signedOut))
 }
