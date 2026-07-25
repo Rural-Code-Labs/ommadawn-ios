@@ -41,7 +41,45 @@ public extension Client {
     init(environment: APIEnvironment = .development) {
         self.init(
             serverURL: environment.baseURL,
+            configuration: .ommadawn,
             transport: URLSessionTransport()
+        )
+    }
+
+    /// Cliente **autenticado**: añade el token a las peticiones protegidas y
+    /// renueva la sesión automáticamente ante un `401`.
+    ///
+    /// - Important: créalo **una sola vez** y compártelo. Cada instancia
+    ///   coordina sus propias renovaciones, así que tener varias reintroduce
+    ///   justo la carrera que el `TokenRefresher` evita.
+    static func authenticated(
+        environment: APIEnvironment = .development,
+        refresher: TokenRefresher? = nil
+    ) -> Client {
+        let refresher = refresher ?? TokenRefresher(environment: environment)
+        return Client(
+            serverURL: environment.baseURL,
+            configuration: .ommadawn,
+            transport: URLSessionTransport(),
+            middlewares: [AuthMiddleware(refresher: refresher)]
+        )
+    }
+
+    /// Revoca la sesión en el servidor (best-effort) con unos tokens dados,
+    /// **sin depender del almacén**. Pensado para el logout: se llama después
+    /// de haber limpiado el Keychain, así que lleva el access token a mano.
+    static func revokeSession(
+        _ tokens: AuthTokens,
+        environment: APIEnvironment = .development
+    ) async {
+        let client = Client(
+            serverURL: environment.baseURL,
+            configuration: .ommadawn,
+            transport: URLSessionTransport(),
+            middlewares: [BearerMiddleware(accessToken: tokens.accessToken)]
+        )
+        _ = try? await client.logout_api_v1_auth_logout_post(
+            .init(body: .json(.init(refresh_token: tokens.refreshToken)))
         )
     }
 }

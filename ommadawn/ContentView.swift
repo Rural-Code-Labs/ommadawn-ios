@@ -1,29 +1,39 @@
-//
+//8
 //  ContentView.swift
 //  ommadawn
 //
-//  Created by Rafael García on 23/07/2026.
-//
 
 import SwiftUI
+import OmmadawnAPI
 
-/// Vista raíz de la app. Hace de "router" de nivel superior.
-///
-/// Por ahora solo muestra el login. En la Fase 3, cuando exista estado de
-/// autenticación, aquí se decidirá qué enseñar:
-///   - sesión iniciada  → app principal (discografía, conciertos…)
-///   - sin sesión        → LoginView
+/// Vista raíz. Enruta según el estado de la sesión:
+///   - `loading`   → mientras se comprueba si hay sesión guardada
+///   - `signedOut` → pantalla de login
+///   - `signedIn`  → app (por ahora, HomeView placeholder)
 struct ContentView: View {
+    @Environment(AuthSession.self) private var session
+
     var body: some View {
-        LoginView()
-            // Badge de diagnóstico (Fase 2): ¿responde la API? Temporal.
-            .overlay(alignment: .bottom) {
-                APIStatusBadge()
-                    .padding(.bottom, 8)
-            }
+        switch session.state {
+        case .loading:
+            ProgressView()
+                .controlSize(.large)
+
+        case .signedOut:
+            LoginView()
+                // Badge de diagnóstico (dev): ¿responde la API? Temporal.
+                .overlay(alignment: .bottom) {
+                    APIStatusBadge()
+                        .padding(.bottom, 8)
+                }
+
+        case .signedIn(let user):
+            HomeView(user: user)
+        }
     }
 }
 
 #Preview {
     ContentView()
+        .environment(AuthSession(initialState: .signedOut))
 }
