@@ -1,9 +1,10 @@
 # Ommadawn (app)
 
-App móvil que cataloga la obra de **Mike Oldfield**: discografía (álbumes de
-estudio, recopilatorios, singles, directos, bootlegs…), conciertos, libros y
-otras secciones. Es el **cliente** de la API [`ommadawn-api`](#relación-con-la-api):
-todo el contenido lo sirve esa API y la app lo presenta.
+App móvil que cataloga **el universo sonoro de Mike Oldfield**: discografía
+(álbumes de estudio, recopilatorios, singles, directos, bootlegs…), conciertos,
+libros y otras secciones. Es el **cliente** de la API
+[`ommadawn-api`](#relación-con-la-api): todo el contenido lo sirve esa API y la
+app lo presenta.
 
 > Proyecto de aprendizaje, pero construido con criterio y con la intención de
 > publicarse de verdad. Se avanza en **fases pequeñas y entendibles**,
@@ -14,21 +15,79 @@ queda para el futuro con otra base de código.
 
 ---
 
+## Estado
+
+- ✅ **Fase 1 — Esqueleto**: proyecto Xcode multiplataforma que arranca.
+- ✅ **Fase 2 — Capa de red**: cliente HTTP tipado generado desde el contrato.
+- ✅ **Fase 3 — Autenticación**: registro, login, tokens en Keychain, renovación
+  automática y logout.
+- ✅ **Identidad visual**: logo, wordmark e icono propios.
+- ⛔ **Fase 4 — Discografía**: bloqueada — la API todavía no la expone (va por su
+  Fase 5). Hasta entonces, solo cabe pulir lo existente.
+
+Ver el [plan por fases](#plan-por-fases) completo abajo.
+
+---
+
 ## Stack
 
 | Tecnología | Función |
 |---|---|
-| Swift 5 | Lenguaje |
-| SwiftUI | UI declarativa |
-| Swift Concurrency (`async/await`) | Llamadas de red y trabajo asíncrono |
-| [swift-openapi-generator](https://github.com/apple/swift-openapi-generator) | Genera el cliente HTTP tipado desde el `openapi.json` de la API |
+| Swift (modo de lenguaje 5, toolchain 6.x) | Lenguaje |
+| SwiftUI + Observation (`@Observable`) | UI declarativa y estado |
+| Swift Concurrency (`async/await`, actores) | Red y trabajo asíncrono sin bloquear la UI |
+| [swift-openapi-generator](https://github.com/apple/swift-openapi-generator) | Genera el cliente HTTP tipado desde el `openapi.json` |
+| [swift-openapi-urlsession](https://github.com/apple/swift-openapi-urlsession) | Transporte HTTP sobre URLSession |
+| Keychain Services | Almacenamiento seguro de tokens |
 | Xcode 26 | IDE y build system |
 
 - **Repositorio**: [`Rural-Code-Labs/ommadawn-ios`](https://github.com/Rural-Code-Labs/ommadawn-ios)
 - **Bundle id**: `com.ruralcodelabs.ommadawn`
 - **Plataformas**: iOS · macOS · visionOS (deployment target 26.5)
-- **Organización**: [Rural-Code-Labs](https://github.com/Rural-Code-Labs) (misma
-  que la API, no la cuenta personal)
+- **Organización**: [Rural-Code-Labs](https://github.com/Rural-Code-Labs) (la misma que la API)
+
+---
+
+## Estructura del proyecto
+
+La **capa de red vive en un paquete Swift local aparte** (`OmmadawnAPI`), separada
+de la app. Contiene el cliente generado y la lógica de sesión reutilizable; la app
+solo la consume.
+
+```
+ommadawn/
+├── OmmadawnAPI/                       # 📦 Paquete local: capa de red
+│   ├── Package.swift
+│   └── Sources/OmmadawnAPI/
+│       ├── openapi.json               # contrato "vendorizado" (snapshot)
+│       ├── openapi-generator-config.yaml
+│       ├── APIClient.swift            # entornos + fábrica del cliente
+│       ├── TokenStore.swift           # tokens en Keychain (actor)
+│       ├── TokenRefresher.swift       # renovación coordinada (single-flight)
+│       ├── AuthMiddleware.swift       # Bearer + (401 → refresh → reintento)
+│       ├── DateTranscoding.swift      # fechas ISO8601 con microsegundos
+│       └── Models.swift               # alias de conveniencia (User)
+│
+├── ommadawn.xcodeproj/
+├── ommadawn/                          # 📱 App
+│   ├── ommadawnApp.swift              # @main · posee la AuthSession
+│   ├── ContentView.swift             # router según el estado de sesión
+│   ├── LoginView.swift
+│   ├── APIStatusBadge.swift           # indicador de conexión (dev)
+│   ├── Auth/
+│   │   ├── AuthSession.swift          # @Observable: estado + login/registro/logout
+│   │   ├── HomeView.swift             # placeholder de "sesión iniciada"
+│   │   └── RegisterView.swift
+│   ├── Design/
+│   │   └── BrandMark.swift            # el logo "O" como vista reutilizable
+│   └── Assets.xcassets/               # AppIcon, BrandGray, AccentColor
+│
+├── ommadawnTests/                     # Tests unitarios (Swift Testing)
+└── ommadawnUITests/                   # Tests de UI
+```
+
+> El código del cliente generado (`Client.swift`, `Types.swift`) **no se versiona**:
+> lo produce el build plugin en cada compilación a partir de `openapi.json`.
 
 ---
 
@@ -54,46 +113,72 @@ proyectos. En vez de escribir a mano modelos y llamadas, generamos el cliente co
 - Menos código de red que mantener a mano.
 
 La API versiona desde el día 1 (`/api/v1/...`): un cambio incompatible será una
-versión nueva, no romper la existente. La app depende de ese contrato estable.
+versión nueva, no romper la existente.
 
-### Autenticación
+### Regenerar el cliente cuando cambie la API
 
-La API maneja **dos tokens** y la app debe respetar ese flujo:
+El `openapi.json` es un **snapshot** dentro del repo. Cuando la API cambie, se
+refresca a mano y se recompila:
+
+```bash
+curl -s http://127.0.0.1:8000/openapi.json \
+  -o OmmadawnAPI/Sources/OmmadawnAPI/openapi.json
+```
+
+Notas de la generación:
+
+- **`serverURL` = solo el origen** (`http://127.0.0.1:8000`). Las rutas del contrato
+  ya incluyen `/api/v1/...`, así que ese prefijo **no** va en la base URL.
+- La **primera compilación en Xcode** pide confiar en el plugin
+  (`OpenAPIGenerator` → *Trust & Enable*). Por CLI se usa
+  `xcodebuild ... -skipPackagePluginValidation`.
+- **Limitación conocida:** el campo opcional `full_name` **no aparece** en el modelo
+  generado. El generador descarta el `anyOf` con `null` que emite Pydantic para los
+  opcionales; si se necesita, se ajusta del lado de la API.
+
+---
+
+## Autenticación
+
+Implementada de punta a punta. La API maneja **dos tokens** y la app respeta ese flujo:
 
 | | Access token | Refresh token |
 |---|---|---|
 | Qué es | JWT firmado | Cadena opaca aleatoria |
-| Duración | Corta (~15 min) | Larga (~30 días) |
-| Uso | `Authorization: Bearer <token>` en cada petición | Renovar el access token |
+| Duración | Corta (~15 min) | Larga (~30 días), **rotativo** |
+| Uso | `Authorization: Bearer <token>` | Renovar el access token |
 
-- El access token caduca pronto: cuando la API responde `401`, la app renueva con
-  el refresh token (`POST /api/v1/auth/refresh`) y reintenta.
-- **Rotación**: cada renovación devuelve un par nuevo; hay que **guardar siempre
-  el último** refresh token. En iOS los tokens van al **Keychain**, nunca a
-  `UserDefaults`.
-- `logout` revoca el refresh token en el servidor.
+Cómo está montado:
 
-Endpoints de auth disponibles: `register`, `login`, `refresh`, `logout`, `me`
-(ver README de la API para el detalle).
+- **`TokenStore`** (actor): guarda el par de tokens en **un único item** del Keychain
+  (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, nunca `UserDefaults`). Un solo item
+  porque el refresh **rota** y hay que actualizarlo de forma atómica.
+- **`AuthMiddleware`**: añade el `Bearer` y, ante un `401`, renueva y **reintenta una
+  vez**. Va por lista de **exclusión** (health/login/register/refresh) → todo lo demás
+  queda protegido por defecto. `TokenRefresher` coordina las renovaciones con
+  *single-flight* (dos renovaciones a la vez invalidarían la familia de tokens).
+- **`AuthSession`** (`@Observable`): estado `loading / signedOut / signedIn`; la vista
+  raíz enruta según él. Expone `restore` (arranque), `logIn`, `register` (con
+  auto-login) y `logOut`.
+- **Logout instantáneo**: cierra en local primero (sin esperar a la red) y revoca en el
+  servidor en segundo plano.
+- Login por **usuario _o_ email** (campo `username_or_email`).
+
+Endpoints de auth: `register`, `login`, `refresh`, `logout`, `me`.
 
 ---
 
-## Estructura del proyecto
+## Identidad visual
 
-```
-ommadawn/
-├── ommadawn.xcodeproj/          # Proyecto Xcode
-├── ommadawn/                    # Código de la app
-│   ├── ommadawnApp.swift        # @main · punto de entrada (App / Scene)
-│   ├── ContentView.swift        # Vista raíz (por ahora el template de Xcode)
-│   └── Assets.xcassets/         # Iconos, colores
-├── ommadawnTests/               # Tests unitarios (Swift Testing)
-└── ommadawnUITests/             # Tests de UI
-```
+Marca propia de estilo caligráfico, montada como un pequeño sistema reutilizable y
+**sin empaquetar fuentes** (usa las que ya trae iOS):
 
-> Estado actual: **scaffold recién creado**. Aún es la plantilla por defecto de
-> Xcode (una vista "Hello, world!"). La capa de red, el cliente generado y las
-> pantallas de catálogo se irán añadiendo por fases.
+- **Logo**: la inicial **"O" de Didot** (alto contraste) inclinada, en carboncillo.
+  Vive en `Design/BrandMark.swift` y es la misma imagen que el icono de la app.
+- **Wordmark**: *Ommadawn* en **Snell Roundhand** (script).
+- **Color de marca**: `BrandGray` en el catálogo, adaptativo a claro/oscuro.
+- **Estilo general**: *minimal del sistema* — el resto de la UI se apoya en colores y
+  materiales nativos de iOS.
 
 ---
 
@@ -106,16 +191,18 @@ Requisitos: **Xcode 26** o superior (macOS).
 open ommadawn.xcodeproj
 ```
 
-Compilar y ejecutar desde Xcode (⌘R) sobre un simulador de iPhone, o por línea
-de comandos:
+Compilar y ejecutar desde Xcode (⌘R) sobre un simulador de iPhone, o por línea de comandos:
 
 ```bash
-# Build
-xcodebuild -scheme ommadawn -destination 'platform=iOS Simulator,name=iPhone 16' build
+# Build (el simulador de referencia es iPhone 17; en Xcode 26 ya no existe iPhone 16)
+xcodebuild -scheme ommadawn -destination 'platform=iOS Simulator,name=iPhone 17' build
 
 # Tests
-xcodebuild -scheme ommadawn -destination 'platform=iOS Simulator,name=iPhone 16' test
+xcodebuild -scheme ommadawn -destination 'platform=iOS Simulator,name=iPhone 17' test
 ```
+
+> La primera vez, Xcode pedirá **confiar en el plugin** de generación
+> (`OpenAPIGenerator`). Por CLI, añade `-skipPackagePluginValidation`.
 
 ### Levantar la API en local
 
@@ -131,8 +218,8 @@ uvicorn app.main:app --reload   # http://localhost:8000
 Comprueba que responde: `http://localhost:8000/docs`.
 
 > **Simulador y `localhost`.** El simulador de iOS comparte red con el Mac, así
-> que `http://localhost:8000` funciona. En **dispositivo físico** habrá que usar
-> la IP del Mac en la red local (y configurar ATS para permitir HTTP en desarrollo).
+> que `http://localhost:8000` funciona sin más. En **dispositivo físico** habrá que
+> usar la IP del Mac en la red local (y ajustar ATS para permitir HTTP en desarrollo).
 
 ---
 
@@ -144,10 +231,11 @@ API ya lo expone.
 
 | Fase | Contenido | Estado |
 |---|---|---|
-| **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca (plantilla). | ✅ Hecha |
-| **2 — Capa de red** | Integrar `swift-openapi-generator` con el `openapi.json`, cliente base y configuración de entorno (base URL). | ⏭️ Siguiente |
-| **3 — Autenticación** | Pantallas de registro/login, guardado de tokens en Keychain, renovación automática con el refresh token. | Pendiente |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | Pendiente |
+| **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca. | ✅ Hecha |
+| **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
+| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática, logout. | ✅ Hecha |
+| **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
+| **4 — Discografía** | Listado y detalle de discos. | ⛔ Bloqueada (la API aún no la expone) |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar. | Pendiente |
