@@ -63,17 +63,18 @@ struct LoginView: View {
 
     private var header: some View {
         VStack(spacing: 8) {
-            Image(systemName: "waveform")
-                .font(.system(size: 56))
-                .foregroundStyle(.tint)
-                .symbolEffect(.pulse, isActive: isSubmitting)
+            BrandMark(size: 150)
+                .opacity(isSubmitting ? 0.4 : 1)
 
-            Text("ommadawn")
-                .font(.largeTitle.bold())
+            VStack(spacing: 2) {
+                Text("Ommadawn")
+                    .font(.custom("SnellRoundhand-Bold", size: 46))
+                    .foregroundStyle(Color("BrandGray"))
 
-            Text("El catálogo de Mike Oldfield")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                Text("El universo sonoro de Mike Oldfield")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
