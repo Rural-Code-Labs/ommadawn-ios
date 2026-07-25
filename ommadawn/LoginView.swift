@@ -23,6 +23,8 @@ struct LoginView: View {
     @State private var isSubmitting = false
     /// Mensaje de error a mostrar bajo el formulario (nil = sin error).
     @State private var errorMessage: String?
+    /// Controla la presentación de la hoja de registro.
+    @State private var showingRegister = false
 
     /// Solo evita enviar formularios vacíos. La validación de verdad
     /// (credenciales correctas) la hace el servidor.
@@ -138,10 +140,16 @@ struct LoginView: View {
             Text("¿No tienes cuenta?")
                 .foregroundStyle(.secondary)
             Button("Crear una") {
-                // TODO: paso 3.5 — navegar a la pantalla de registro.
+                showingRegister = true
             }
         }
         .font(.footnote)
+        .sheet(isPresented: $showingRegister) {
+            // Pasamos la sesión explícitamente: las hojas no siempre heredan
+            // el entorno del presentador.
+            RegisterView()
+                .environment(session)
+        }
     }
 
     // MARK: - Acciones

@@ -26,6 +26,15 @@ enum LoginError: Error {
     case network(Error)       // sin conexión / fallo de transporte
 }
 
+/// Motivos por los que un registro puede fallar.
+enum RegisterError: Error {
+    case alreadyTaken             // 409 — usuario o email ya en uso
+    case invalidData              // 422 — datos rechazados por el servidor
+    case registeredButLoginFailed // registró pero el auto-login falló (raro)
+    case unexpected(Int)
+    case network(Error)
+}
+
 @MainActor
 @Observable
 final class AuthSession {
@@ -107,6 +116,39 @@ final class AuthSession {
         } catch {
             // Transporte, decodificación o /me fallando: todo cae aquí.
             throw LoginError.network(error)
+        }
+    }
+
+    /// Registra un usuario nuevo y, si va bien, inicia sesión automáticamente.
+    ///
+    /// El endpoint de registro no devuelve tokens (solo el usuario creado), así
+    /// que encadenamos un `logIn` con las mismas credenciales para dejar a la
+    /// persona directamente dentro de la app.
+    ///
+    /// - Throws: siempre un `RegisterError`, listo para pintar en la pantalla.
+    func register(username: String, email: String, password: String) async throws {
+        do {
+            let output = try await client.register_api_v1_auth_register_post(
+                .init(body: .json(.init(username: username, email: email, password: password)))
+            )
+            switch output {
+            case .created:
+                try await logIn(usernameOrEmail: username, password: password)
+            case .conflict:
+                throw RegisterError.alreadyTaken
+            case .unprocessableContent:
+                throw RegisterError.invalidData
+            case .undocumented(let statusCode, _):
+                throw RegisterError.unexpected(statusCode)
+            }
+        } catch let error as RegisterError {
+            throw error
+        } catch is LoginError {
+            // La cuenta se creó, pero el auto-login falló. Que inicie sesión
+            // a mano desde la pantalla de login.
+            throw RegisterError.registeredButLoginFailed
+        } catch {
+            throw RegisterError.network(error)
         }
     }
 
