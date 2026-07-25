@@ -14,6 +14,27 @@ import Foundation
 import HTTPTypes
 import OpenAPIRuntime
 
+/// Middleware mínimo que inyecta un access token **fijo**.
+///
+/// Se usa solo para revocar la sesión en el logout: cuando ya hemos borrado
+/// los tokens del almacén, el `AuthMiddleware` normal no encontraría nada que
+/// inyectar, así que le pasamos el token capturado a mano.
+struct BearerMiddleware: ClientMiddleware {
+    let accessToken: String
+
+    func intercept(
+        _ request: HTTPRequest,
+        body: HTTPBody?,
+        baseURL: URL,
+        operationID: String,
+        next: @Sendable (HTTPRequest, HTTPBody?, URL) async throws -> (HTTPResponse, HTTPBody?)
+    ) async throws -> (HTTPResponse, HTTPBody?) {
+        var request = request
+        request.headerFields[.authorization] = "Bearer \(accessToken)"
+        return try await next(request, body, baseURL)
+    }
+}
+
 public struct AuthMiddleware: ClientMiddleware {
     private let refresher: TokenRefresher
 

@@ -64,4 +64,22 @@ public extension Client {
             middlewares: [AuthMiddleware(refresher: refresher)]
         )
     }
+
+    /// Revoca la sesión en el servidor (best-effort) con unos tokens dados,
+    /// **sin depender del almacén**. Pensado para el logout: se llama después
+    /// de haber limpiado el Keychain, así que lleva el access token a mano.
+    static func revokeSession(
+        _ tokens: AuthTokens,
+        environment: APIEnvironment = .development
+    ) async {
+        let client = Client(
+            serverURL: environment.baseURL,
+            configuration: .ommadawn,
+            transport: URLSessionTransport(),
+            middlewares: [BearerMiddleware(accessToken: tokens.accessToken)]
+        )
+        _ = try? await client.logout_api_v1_auth_logout_post(
+            .init(body: .json(.init(refresh_token: tokens.refreshToken)))
+        )
+    }
 }

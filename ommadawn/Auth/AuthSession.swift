@@ -38,6 +38,7 @@ final class AuthSession {
 
     private(set) var state: State = .loading
 
+    private let environment: APIEnvironment
     private let tokenStore: TokenStore
     private let refresher: TokenRefresher
     private let client: Client
@@ -49,6 +50,7 @@ final class AuthSession {
         initialState: State = .loading
     ) {
         let refresher = TokenRefresher(tokenStore: tokenStore, environment: environment)
+        self.environment = environment
         self.tokenStore = tokenStore
         self.refresher = refresher
         self.client = Client.authenticated(environment: environment, refresher: refresher)
@@ -113,13 +115,19 @@ final class AuthSession {
     /// La revocación es *best-effort*: aunque falle (sin red), la sesión local
     /// se borra igual. Lo que nunca puede pasar es quedarnos "medio dentro".
     func logOut() async {
-        if let tokens = try? await tokenStore.load() {
-            _ = try? await client.logout_api_v1_auth_logout_post(
-                .init(body: .json(.init(refresh_token: tokens.refreshToken)))
-            )
-        }
+        // 1) Cierre local INMEDIATO, sin tocar la red. Estas operaciones son
+        //    locales (Keychain, ~ms), así que la UI responde al instante
+        //    aunque el servidor esté caído o lento.
+        let tokens = try? await tokenStore.load()
         try? await tokenStore.clear()
         state = .signedOut
+
+        // 2) Revocación en el servidor: best-effort, en segundo plano. No
+        //    bloquea el cierre de sesión; si no hay red, da igual, ya estamos
+        //    fuera. Lleva el token capturado porque el Keychain ya está limpio.
+        if let tokens {
+            Task { await Client.revokeSession(tokens, environment: environment) }
+        }
     }
 
     // MARK: - Privado
