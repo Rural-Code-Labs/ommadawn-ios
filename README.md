@@ -10,8 +10,10 @@ app lo presenta.
 > publicarse de verdad. Se avanza en **fases pequeñas y entendibles**,
 > priorizando el *por qué* de cada decisión sobre la velocidad.
 
-Primero **iOS**; el proyecto es multiplataforma (iOS, macOS, visionOS) y Android
-queda para el futuro con otra base de código.
+Primero **iOS**; el objetivo es multiplataforma (iOS, macOS, visionOS) — el target de
+Xcode ya lo es de nombre, pero el soporte real de macOS/visionOS todavía está pendiente
+de trabajo (hay APIs de UIKit-only colándose en las vistas nuevas). Android queda para
+el futuro con otra base de código.
 
 ---
 
@@ -20,10 +22,11 @@ queda para el futuro con otra base de código.
 - ✅ **Fase 1 — Esqueleto**: proyecto Xcode multiplataforma que arranca.
 - ✅ **Fase 2 — Capa de red**: cliente HTTP tipado generado desde el contrato.
 - ✅ **Fase 3 — Autenticación**: registro, login, tokens en Keychain, renovación
-  automática y logout.
+  automática (reactiva ante `401` y proactiva con `expires_in`) y logout.
 - ✅ **Identidad visual**: logo, wordmark e icono propios.
-- ⛔ **Fase 4 — Discografía**: bloqueada — la API todavía no la expone (va por su
-  Fase 5). Hasta entonces, solo cabe pulir lo existente.
+- 🚧 **Fase 4 — Discografía**: primera entrega — listado (grid/lista, filtro, orden) y
+  detalle con tracklist, **solo lectura**. Pendiente: menú de Cuenta como desplegable,
+  soporte real de macOS y edición de discos para administradores.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -71,14 +74,22 @@ ommadawn/
 ├── ommadawn.xcodeproj/
 ├── ommadawn/                          # 📱 App
 │   ├── ommadawnApp.swift              # @main · posee la AuthSession
-│   ├── ContentView.swift             # router según el estado de sesión
+│   ├── ContentView.swift              # router según el estado de sesión
+│   ├── RootTabView.swift              # shell tras el login: TabView Discografía/Cuenta
 │   ├── LoginView.swift
 │   ├── Auth/
 │   │   ├── AuthSession.swift          # @Observable: estado + login/registro/logout
-│   │   ├── HomeView.swift             # placeholder de "sesión iniciada"
 │   │   └── RegisterView.swift
+│   ├── Account/
+│   │   └── AccountView.swift          # saludo, cerrar sesión, apariencia
+│   ├── Discography/                   # Fase 4: catálogo (solo lectura)
+│   │   ├── DiscographyStore.swift
+│   │   ├── ReleaseListView.swift
+│   │   ├── ReleaseDetailView.swift
+│   │   └── Release+Presentation.swift
 │   ├── Design/
-│   │   └── BrandMark.swift            # el logo "O" como vista reutilizable
+│   │   ├── BrandMark.swift            # el logo "O" como vista reutilizable
+│   │   └── AppTheme.swift             # apariencia (Sistema/Claro/Oscuro)
 │   └── Assets.xcassets/               # AppIcon, BrandGray, AccentColor
 │
 ├── ommadawnTests/                     # Tests unitarios (Swift Testing)
@@ -131,9 +142,9 @@ Notas de la generación:
 - La **primera compilación en Xcode** pide confiar en el plugin
   (`OpenAPIGenerator` → *Trust & Enable*). Por CLI se usa
   `xcodebuild ... -skipPackagePluginValidation`.
-- **Limitación conocida:** el campo opcional `full_name` **no aparece** en el modelo
-  generado. El generador descarta el `anyOf` con `null` que emite Pydantic para los
-  opcionales; si se necesita, se ajusta del lado de la API.
+- **Resuelto:** el campo opcional `full_name` se arregló del lado de la API
+  (`app/core/openapi.py` post-procesa el esquema: "anulable" → "opcional"). Cualquier
+  campo opcional futuro queda cubierto igual, sin hacer nada en la app.
 
 ---
 
@@ -152,10 +163,11 @@ Cómo está montado:
 - **`TokenStore`** (actor): guarda el par de tokens en **un único item** del Keychain
   (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, nunca `UserDefaults`). Un solo item
   porque el refresh **rota** y hay que actualizarlo de forma atómica.
-- **`AuthMiddleware`**: añade el `Bearer` y, ante un `401`, renueva y **reintenta una
-  vez**. Va por lista de **exclusión** (health/login/register/refresh) → todo lo demás
-  queda protegido por defecto. `TokenRefresher` coordina las renovaciones con
-  *single-flight* (dos renovaciones a la vez invalidarían la familia de tokens).
+- **`AuthMiddleware`**: añade el `Bearer`, renueva **proactivamente** si está a punto de
+  caducar (usando `expires_in`), y ante un `401` renueva y **reintenta una vez**.
+  Va por lista de **exclusión** (health/login/register/refresh) → todo lo demás queda
+  protegido por defecto. `TokenRefresher` coordina las renovaciones con *single-flight*
+  (dos renovaciones a la vez invalidarían la familia de tokens).
 - **`AuthSession`** (`@Observable`): estado `loading / signedOut / signedIn`; la vista
   raíz enruta según él. Expone `restore` (arranque), `logIn`, `register` (con
   auto-login) y `logOut`.
@@ -232,9 +244,9 @@ API ya lo expone.
 |---|---|---|
 | **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca. | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
-| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática, logout. | ✅ Hecha |
+| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | ⛔ Bloqueada (la API aún no la expone) |
+| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha (lectura ✅; pendiente: menú de Cuenta, macOS real, edición admin) |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar. | Pendiente |

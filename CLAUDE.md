@@ -33,14 +33,22 @@ el futuro con otra base de código.
   *Rural-Code-Labs*, la misma que la API, no la cuenta personal). Carpeta local:
   `~/development/swift/ommadawn`. El repo va con sufijo **`-ios`** (habrá un futuro
   cliente Android aparte); la carpeta y el target Xcode se llaman `ommadawn`.
-- **Estado**: **Fase 3 hecha** — autenticación completa y funcional: registro, login (por
-  `username_or_email`), sesión persistente en Keychain, renovación automática ante `401` y
-  logout. Sobre la capa de red de la Fase 2 (`OmmadawnAPI`, cliente generado desde
-  `openapi.json`).
+- **Estado**: **Fase 3 hecha** (autenticación completa: registro, login por
+  `username_or_email`, sesión persistente en Keychain, renovación automática — reactiva
+  ante `401` y **proactiva** usando `expires_in` — y logout) y **Fase 4 en marcha**
+  (discografía: primera entrega ya en `main` — listado con grid/lista/filtro/orden y
+  detalle con tracklist, **solo lectura**). Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (iOS/macOS/visionOS),
   Swift 5, Xcode 26.
-- **Siguiente paso**: **Fase 4 — discografía**, pero está **bloqueada**: la API aún no la
-  expone (va por su Fase 5). Hasta entonces, solo cabe pulir la app actual. Ver plan abajo.
+- **Pendiente acordado para seguir con Fase 4** (26 jul 2026, sin empezar):
+  1. Sacar "Cuenta" del `TabView` y convertirla en menú desplegable arriba a la
+     izquierda (cerrar sesión + opciones de cuenta), en vez de pestaña propia.
+  2. **Soporte macOS real**: el target ya es multiplataforma de nombre, pero al
+     compilar para macOS falla — `navigationBarTitleDisplayMode` (UIKit) no existe en
+     AppKit. Aparece en `ReleaseDetailView`/`ReleaseListView`; hay que revisar todo lo
+     específico de iOS en las vistas nuevas y adaptarlo o condicionarlo por plataforma.
+  3. Edición de discos (crear/editar obra, edición, temas) cuando el usuario
+     autenticado es admin — la API ya soporta ese CRUD (`require_admin`), falta la UI.
 
 ---
 
@@ -122,10 +130,47 @@ rotación)**. Implicaciones para la app:
 - **Fechas**: `DateTranscoder` propio porque la API (Python) emite microsegundos, que el
   decodificador ISO8601 por defecto rechaza.
 
-> ⚠️ **`full_name` no existe en el modelo generado.** El generador descarta el `anyOf` con
-> `null` que emite Pydantic para los opcionales. Si se necesita, se arregla del lado de la
-> API (declarar los opcionales de forma que el generador los entienda). Lo mismo podría
-> pasar con futuros campos opcionales.
+> **Resuelto:** `full_name` llegó a faltar en el modelo generado (el generador descartaba
+> el `anyOf` con `null` que emite Pydantic para los opcionales). Se arregló del lado de la
+> API (`app/core/openapi.py` post-procesa el esquema: "anulable" → "opcional", ver el
+> `CLAUDE.md` de `ommadawn-api`). Cualquier campo opcional futuro queda cubierto igual, sin
+> hacer nada en la app.
+
+---
+
+## Discografía (Fase 4)
+
+Primera entrega en `main`, **solo lectura** (crear/editar queda para cuando haya UI de
+admin). Consume `/api/v1/discography/*` de la API (`Release` → `Edition` → `Track`/`Image`).
+
+- **`Discography/DiscographyStore`**: envuelve el `Client` de `AuthSession` (expuesto como
+  `let client` para reutilizarlo, en vez de crear una sesión HTTP aparte) con
+  `fetchReleases(type:)` y `fetchRelease(id:)`. `struct` sin estado propio, no
+  `@Observable`: no hay nada aquí que una vista necesite observar.
+- **`ReleaseListView`**: grid o lista (toggle), filtro por tipo y orden por año/nombre
+  (por defecto año) — ambos en un `Menu` en la toolbar, a la altura del título.
+  *Pull-to-refresh* con `.refreshable`. **Ojo**: `.task(id:)` (carga inicial) y
+  `.refreshable` pueden llamar a `load()` casi a la vez; `load()` comparte una única
+  `Task` en curso para que la segunda llamada se una a la primera en vez de disparar
+  otra petición (si no, la API cancela una de las dos: `NSURLErrorCancelled`).
+- **`ReleaseDetailView`**: recibe el `Release` ya completo desde el listado (el contrato
+  ya anida ediciones/temas/imágenes en `GET /releases`, no hace falta pedirlo aparte);
+  el *pull-to-refresh* del detalle es lo único que vuelve a llamar a la API
+  (`fetchRelease(id:)`), por si algo cambió desde que se cargó la lista.
+- **`Release+Presentation.swift`**: helpers de presentación sobre los tipos generados
+  (`displayEdition`, `coverURL`, `ReleaseType.displayName` en español) — viven en el
+  target de la app, no en `OmmadawnAPI`, porque son decisiones de cómo se muestra el
+  catálogo, no del contrato en sí.
+- **`RootTabView`**: sustituye al `HomeView` placeholder. `TabView` con pestañas
+  Discografía / Cuenta (la de Cuenta se convertirá en menú desplegable, ver pendientes
+  arriba). Cada pestaña con su propio `NavigationStack`.
+- **`AccountView`** (antes `HomeView`): saludo + cerrar sesión + selector de apariencia
+  (`AppearancePicker`, Sistema/Claro/Oscuro) — el selector vivía como botón flotante
+  arriba a la derecha en toda la app; ahora es una opción de Cuenta.
+
+**No se llama `Image` a secas** el alias de `ImageRead` en `Models.swift` (es
+`ReleaseImage`): colisionaría con `SwiftUI.Image` en cualquier vista que importe ambos
+módulos.
 
 ---
 
@@ -135,17 +180,32 @@ rotación)**. Implicaciones para la app:
 ommadawn/
 ├── ommadawn.xcodeproj/          # Proyecto Xcode (multiplataforma)
 ├── ommadawn/                    # Código de la app
-│   ├── ommadawnApp.swift        # @main · App / Scene (punto de entrada)
-│   ├── ContentView.swift        # Vista raíz (aún el template de Xcode)
-│   └── Assets.xcassets/         # Iconos y colores
+│   ├── ommadawnApp.swift        # @main · posee la AuthSession
+│   ├── ContentView.swift        # Vista raíz: enruta según el estado de sesión
+│   ├── RootTabView.swift        # Shell tras el login: TabView Discografía/Cuenta
+│   ├── LoginView.swift
+│   ├── Auth/
+│   │   ├── AuthSession.swift    # @Observable: estado + login/registro/logout
+│   │   └── RegisterView.swift
+│   ├── Account/
+│   │   └── AccountView.swift    # Saludo, cerrar sesión, selector de apariencia
+│   ├── Discography/              # Fase 4: catálogo (solo lectura por ahora)
+│   │   ├── DiscographyStore.swift
+│   │   ├── ReleaseListView.swift
+│   │   ├── ReleaseDetailView.swift
+│   │   └── Release+Presentation.swift
+│   ├── Design/
+│   │   ├── BrandMark.swift      # el logo "O" como vista reutilizable
+│   │   └── AppTheme.swift       # AppTheme + AppearancePicker
+│   └── Assets.xcassets/         # AppIcon, BrandGray, AccentColor
 ├── ommadawnTests/               # Tests unitarios (Swift Testing)
 └── ommadawnUITests/             # Tests de UI (XCUITest)
 ```
 
-A medida que avancen las fases, la idea es organizar por **features/dominios** (auth,
-discography, concerts…) con una capa de red compartida y el cliente OpenAPI generado
-aparte. La estructura concreta se decidirá al llegar a cada fase, sin sobre-diseñar antes
-de tiempo.
+Organizado por **features/dominios** (auth, account, discography…), cada uno con sus
+propias vistas. La capa de red compartida y el cliente OpenAPI generado viven aparte, en
+el paquete `OmmadawnAPI/` (ver arriba). La estructura de los dominios que faltan
+(conciertos, libros…) se decidirá al llegar a esa fase, sin sobre-diseñar antes de tiempo.
 
 ---
 
@@ -246,8 +306,8 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 |---|---|---|
 | **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
-| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | ⛔ Bloqueada (la API aún no la expone) |
+| **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle en lectura ✅; pendiente: menú de Cuenta, soporte macOS, edición admin |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |
