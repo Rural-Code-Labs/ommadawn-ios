@@ -2,10 +2,13 @@
 //  ReleaseListView.swift
 //  ommadawn
 //
-//  Listado del catálogo (discografía). Filtro por tipo y cambio de vista
-//  (grid ↔ lista) como botones en la toolbar, a la altura del título. El
-//  hueco para una futura vista "temporal" (cronológica) queda listo en
-//  DisplayMode sin implementarla aún.
+//  Listado del catálogo (discografía). Filtro por tipo, orden (con dirección
+//  asc/desc) y cambio de vista (grid ↔ lista) como controles flotantes cerca
+//  del borde inferior derecho, uno encima del otro. Sin título propio: la
+//  pestaña activa (RootTabView) ya dice en qué sección estamos, y la cabecera
+//  común de la app vive por encima del TabView. El hueco para una futura
+//  vista "temporal" (cronológica) queda listo en DisplayMode sin
+//  implementarla aún.
 //
 
 import SwiftUI
@@ -32,6 +35,7 @@ struct ReleaseListView: View {
     @State private var displayMode: DiscographyDisplayMode = .grid
     @State private var typeFilter: ReleaseType?
     @State private var sortOrder: ReleaseSortOrder = .year
+    @State private var sortAscending = true
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -45,30 +49,28 @@ struct ReleaseListView: View {
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
 
     private var sortedReleases: [Release] {
+        let ascending = sortAscending
         switch sortOrder {
         case .year:
             return releases.sorted { lhs, rhs in
                 let lyear = lhs.displayEdition?.release_date.flatMap { Int($0.prefix(4)) } ?? .max
                 let ryear = rhs.displayEdition?.release_date.flatMap { Int($0.prefix(4)) } ?? .max
-                if lyear != ryear { return lyear < ryear }
+                if lyear != ryear { return ascending ? lyear < ryear : lyear > ryear }
                 return lhs.title.localizedStandardCompare(rhs.title) == .orderedAscending
             }
         case .name:
             return releases.sorted {
-                $0.title.localizedStandardCompare($1.title) == .orderedAscending
+                let order = $0.title.localizedStandardCompare($1.title)
+                return ascending ? order == .orderedAscending : order == .orderedDescending
             }
         }
     }
 
     var body: some View {
         content
-            .navigationTitle("Discografía")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarTrailing) {
-                    filterMenu
-                    viewModeButton
-                }
+            .toolbar(.hidden, for: .navigationBar)
+            .overlay(alignment: .bottomTrailing) {
+                floatingControls
             }
             .task(id: typeFilter) {
                 await load()
@@ -133,11 +135,29 @@ struct ReleaseListView: View {
         }
     }
 
+    /// Filtro/orden y cambio de vista, flotantes sobre el contenido cerca
+    /// del borde inferior derecho, uno encima del otro.
+    private var floatingControls: some View {
+        VStack(spacing: 14) {
+            filterMenu
+            viewModeButton
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .background(.regularMaterial, in: Capsule())
+        .padding(.trailing, 12)
+        .padding(.bottom, 20)
+    }
+
     private var filterMenu: some View {
         Menu {
             Picker("Ordenar por", selection: $sortOrder) {
                 Text("Año").tag(ReleaseSortOrder.year)
                 Text("Nombre").tag(ReleaseSortOrder.name)
+            }
+            Picker("Dirección", selection: $sortAscending) {
+                Label("Ascendente", systemImage: "arrow.up").tag(true)
+                Label("Descendente", systemImage: "arrow.down").tag(false)
             }
             Section("Tipo") {
                 Picker("Tipo", selection: $typeFilter) {
@@ -148,7 +168,9 @@ struct ReleaseListView: View {
                 }
             }
         } label: {
-            Image(systemName: typeFilter == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+            Image(systemName: typeFilter == nil ? "line.3.horizontal.decrease" : "line.3.horizontal.decrease.circle.fill")
+                .font(.system(size: 18))
+                .frame(width: 24, height: 24)
         }
         .accessibilityLabel("Filtrar y ordenar")
     }
@@ -158,6 +180,8 @@ struct ReleaseListView: View {
             displayMode = displayMode == .grid ? .list : .grid
         } label: {
             Image(systemName: displayMode == .grid ? "list.bullet" : "square.grid.2x2")
+                .font(.system(size: 18))
+                .frame(width: 24, height: 24)
         }
         .accessibilityLabel(displayMode == .grid ? "Ver como lista" : "Ver como cuadrícula")
     }
