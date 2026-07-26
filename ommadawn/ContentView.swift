@@ -9,7 +9,7 @@ import OmmadawnAPI
 /// Vista raíz. Enruta según el estado de la sesión:
 ///   - `loading`   → mientras se comprueba si hay sesión guardada
 ///   - `signedOut` → pantalla de login
-///   - `signedIn`  → app (por ahora, HomeView placeholder)
+///   - `signedIn`  → app (RootTabView: Discografía + Cuenta)
 struct ContentView: View {
     @Environment(AuthSession.self) private var session
     @AppStorage("appearance") private var theme: AppTheme = .system
@@ -17,11 +17,6 @@ struct ContentView: View {
     var body: some View {
         content
             .preferredColorScheme(theme.colorScheme)
-            .overlay(alignment: .topTrailing) {
-                ThemeSwitcher(theme: $theme)
-                    .padding(.top, 4)
-                    .padding(.trailing, 8)
-            }
     }
 
     @ViewBuilder
@@ -35,7 +30,7 @@ struct ContentView: View {
             LoginView()
 
         case .signedIn(let user):
-            HomeView(user: user)
+            RootTabView(user: user)
         }
     }
 }
