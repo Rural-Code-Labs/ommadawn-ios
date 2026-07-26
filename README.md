@@ -73,7 +73,6 @@ ommadawn/
 │   ├── ommadawnApp.swift              # @main · posee la AuthSession
 │   ├── ContentView.swift             # router según el estado de sesión
 │   ├── LoginView.swift
-│   ├── APIStatusBadge.swift           # indicador de conexión (dev)
 │   ├── Auth/
 │   │   ├── AuthSession.swift          # @Observable: estado + login/registro/logout
 │   │   ├── HomeView.swift             # placeholder de "sesión iniciada"

@@ -12,8 +12,20 @@ import OmmadawnAPI
 ///   - `signedIn`  → app (por ahora, HomeView placeholder)
 struct ContentView: View {
     @Environment(AuthSession.self) private var session
+    @AppStorage("appearance") private var theme: AppTheme = .system
 
     var body: some View {
+        content
+            .preferredColorScheme(theme.colorScheme)
+            .overlay(alignment: .topTrailing) {
+                ThemeSwitcher(theme: $theme)
+                    .padding(.top, 4)
+                    .padding(.trailing, 8)
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch session.state {
         case .loading:
             ProgressView()
@@ -21,11 +33,6 @@ struct ContentView: View {
 
         case .signedOut:
             LoginView()
-                // Badge de diagnóstico (dev): ¿responde la API? Temporal.
-                .overlay(alignment: .bottom) {
-                    APIStatusBadge()
-                        .padding(.bottom, 8)
-                }
 
         case .signedIn(let user):
             HomeView(user: user)
