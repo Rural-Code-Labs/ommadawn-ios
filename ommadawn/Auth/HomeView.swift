@@ -2,9 +2,9 @@
 //  HomeView.swift
 //  ommadawn
 //
-//  Placeholder de "sesión iniciada". Las pantallas reales (discografía,
-//  conciertos…) llegan en fases posteriores; por ahora solo confirma quién
-//  está dentro y permite cerrar sesión.
+//  Pantalla de "sesión iniciada". Las secciones reales (discografía,
+//  conciertos…) llegan en fases posteriores; por ahora es un placeholder
+//  con la identidad de la app: saluda a la persona y permite cerrar sesión.
 //
 
 import SwiftUI
@@ -15,23 +15,41 @@ struct HomeView: View {
     @Environment(AuthSession.self) private var session
 
     var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(.tint)
+        VStack(spacing: 24) {
+            Spacer()
 
-            Text("¡Hola, \(user.username)!")
-                .font(.title2.bold())
-            Text(user.email)
-                .foregroundStyle(.secondary)
+            // Masthead con la misma marca que el login.
+            VStack(spacing: 6) {
+                BrandMark(size: 88)
+                Text("Ommadawn")
+                    .font(.custom("SnellRoundhand-Bold", size: 30))
+                    .foregroundStyle(Color("BrandGray"))
+            }
 
-            Button("Cerrar sesión") {
+            VStack(spacing: 6) {
+                Text("Hola, \(user.username)")
+                    .font(.title3.weight(.semibold))
+                Text("Tu catálogo de Mike Oldfield llegará muy pronto.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Spacer()
+
+            Button {
                 Task { await session.logOut() }
+            } label: {
+                Text("Cerrar sesión")
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
-            .padding(.top, 8)
+            .controlSize(.large)
         }
-        .padding()
+        .padding(.horizontal, 24)
+        .padding(.vertical, 32)
+        .frame(maxWidth: 420)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

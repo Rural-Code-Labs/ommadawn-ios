@@ -21,11 +21,6 @@ struct ContentView: View {
 
         case .signedOut:
             LoginView()
-                // Badge de diagnóstico (dev): ¿responde la API? Temporal.
-                .overlay(alignment: .bottom) {
-                    APIStatusBadge()
-                        .padding(.bottom, 8)
-                }
 
         case .signedIn(let user):
             HomeView(user: user)
