@@ -15,19 +15,35 @@ import Security
 
 // MARK: - Modelo
 
-/// El par de tokens que emite la API (`POST /auth/login` y `/auth/refresh`).
+/// El par de tokens que emite la API (`POST /auth/login` y `/auth/refresh`),
+/// con la caducidad del access token.
 ///
-/// No guardamos fecha de caducidad porque **el contrato no la expone**
-/// (`TokenPair` solo trae `access_token` / `refresh_token` / `token_type`).
-/// Por eso la estrategia es *reactiva*: ante un `401`, renovar y reintentar
-/// una vez — que es justo lo que pide el diseño de la API.
+/// El contrato expone `expires_in` (segundos), así que guardamos el momento de
+/// caducidad para poder renovar **proactivamente** antes de que expire. Se
+/// mantiene además la renovación *reactiva* (ante un `401`) como red de seguridad.
 public struct AuthTokens: Codable, Sendable, Equatable {
     public let accessToken: String
     public let refreshToken: String
 
-    public init(accessToken: String, refreshToken: String) {
+    /// Momento en que caduca el access token. Opcional: los tokens guardados
+    /// por versiones anteriores no lo tienen → se trata como "desconocido"
+    /// (sin refresco proactivo; sigue valiendo el reactivo ante `401`).
+    public let expiresAt: Date?
+
+    public init(accessToken: String, refreshToken: String, expiresAt: Date? = nil) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
+        self.expiresAt = expiresAt
+    }
+
+    /// Construye los tokens desde el par de la API, calculando la caducidad
+    /// como "ahora + `expires_in` segundos".
+    public init(pair: Components.Schemas.TokenPair) {
+        self.init(
+            accessToken: pair.access_token,
+            refreshToken: pair.refresh_token,
+            expiresAt: Date().addingTimeInterval(TimeInterval(pair.expires_in))
+        )
     }
 }
 

@@ -43,6 +43,10 @@ public actor TokenRefresher {
     /// Renovación en curso, si la hay (patrón *single-flight*).
     private var inFlight: Task<AuthTokens, Error>?
 
+    /// Margen antes de la caducidad para renovar con antelación (cubre latencia
+    /// de red y desfase de reloj).
+    private static let refreshBuffer: TimeInterval = 60
+
     public init(tokenStore: TokenStore = .shared, environment: APIEnvironment = .development) {
         self.tokenStore = tokenStore
         self.client = Client(
@@ -55,6 +59,21 @@ public actor TokenRefresher {
     /// Tokens actuales, o `nil` si no hay sesión.
     public func currentTokens() async throws -> AuthTokens? {
         try await tokenStore.load()
+    }
+
+    /// Devuelve un access token **válido**, renovando de forma **proactiva** si
+    /// está a punto de caducar (dentro de `refreshBuffer`). Coordinado igual que
+    /// la renovación reactiva (single-flight). Si no se conoce la caducidad
+    /// (`expiresAt == nil`), no renueva por adelantado: queda la red del `401`.
+    public func validAccessToken() async throws -> String {
+        guard let tokens = try await tokenStore.load() else {
+            throw AuthError.notAuthenticated
+        }
+        if let expiresAt = tokens.expiresAt,
+           Date() >= expiresAt.addingTimeInterval(-Self.refreshBuffer) {
+            return try await refresh(staleAccessToken: tokens.accessToken).accessToken
+        }
+        return tokens.accessToken
     }
 
     /// Renueva la sesión y devuelve el par nuevo.
@@ -101,10 +120,7 @@ public actor TokenRefresher {
             let pair = try ok.body.json
             // Guardamos SIEMPRE el par nuevo: el refresh token anterior ya no
             // vale (rotación). Es una única escritura atómica.
-            let tokens = AuthTokens(
-                accessToken: pair.access_token,
-                refreshToken: pair.refresh_token
-            )
+            let tokens = AuthTokens(pair: pair)
             try await tokenStore.save(tokens)
             return tokens
 
