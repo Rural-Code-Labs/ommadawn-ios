@@ -14,6 +14,12 @@ struct HomeView: View {
     let user: User
     @Environment(AuthSession.self) private var session
 
+    /// Nombre a mostrar: el `full_name` si lo hay, si no el `username`.
+    private var displayName: String {
+        if let name = user.full_name, !name.isEmpty { return name }
+        return user.username
+    }
+
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
@@ -27,7 +33,7 @@ struct HomeView: View {
             }
 
             VStack(spacing: 6) {
-                Text("Hola, \(user.username)")
+                Text("Hola, \(displayName)")
                     .font(.title3.weight(.semibold))
                 Text("Tu catálogo de Mike Oldfield llegará muy pronto.")
                     .font(.subheadline)
