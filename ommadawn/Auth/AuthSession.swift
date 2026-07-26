@@ -50,7 +50,11 @@ final class AuthSession {
     private let environment: APIEnvironment
     private let tokenStore: TokenStore
     private let refresher: TokenRefresher
-    private let client: Client
+
+    /// El único cliente HTTP de la app (con `AuthMiddleware` ya cableado).
+    /// Se expone para que otras features (p. ej. discografía) lo reutilicen
+    /// en vez de crear un `Client` aparte, aunque sus endpoints sean públicos.
+    let client: Client
 
     /// - Parameter tokenStore: inyectable para pruebas; por defecto el común.
     init(
