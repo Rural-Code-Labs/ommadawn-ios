@@ -95,10 +95,8 @@ final class AuthSession {
             switch output {
             case .ok(let ok):
                 let pair = try ok.body.json
-                try await tokenStore.save(AuthTokens(
-                    accessToken: pair.access_token,
-                    refreshToken: pair.refresh_token
-                ))
+                // Guarda tokens + caducidad (para el refresco proactivo).
+                try await tokenStore.save(AuthTokens(pair: pair))
                 // El login solo devuelve tokens; el perfil se pide aparte.
                 state = .signedIn(try await fetchProfile())
 

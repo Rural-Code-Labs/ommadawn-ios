@@ -65,13 +65,13 @@ public struct AuthMiddleware: ClientMiddleware {
             return try await next(request, body, baseURL)
         }
 
-        // Endpoint protegido sin sesión: fallamos ya, sin gastar una petición.
-        guard let tokens = try await refresher.currentTokens() else {
-            throw AuthError.notAuthenticated
-        }
+        // Endpoint protegido: conseguimos un access token válido, renovando
+        // PROACTIVAMENTE si está a punto de caducar. Sin sesión, falla ya
+        // (sin gastar una petición).
+        let accessToken = try await refresher.validAccessToken()
 
         var authorized = request
-        authorized.headerFields[.authorization] = "Bearer \(tokens.accessToken)"
+        authorized.headerFields[.authorization] = "Bearer \(accessToken)"
 
         let (response, responseBody) = try await next(authorized, body, baseURL)
 
@@ -87,7 +87,7 @@ public struct AuthMiddleware: ClientMiddleware {
 
         // Renovar (coalescido) y reintentar UNA sola vez. Si la renovación
         // falla, propaga `AuthError.sessionExpired` y la app manda a login.
-        let renewed = try await refresher.refresh(staleAccessToken: tokens.accessToken)
+        let renewed = try await refresher.refresh(staleAccessToken: accessToken)
 
         var retried = request
         retried.headerFields[.authorization] = "Bearer \(renewed.accessToken)"
