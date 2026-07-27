@@ -24,8 +24,9 @@ el futuro con otra base de código.
 - ✅ **Fase 3 — Autenticación**: registro, login, tokens en Keychain, renovación
   automática (reactiva ante `401` y proactiva con `expires_in`) y logout.
 - ✅ **Identidad visual**: logo, wordmark e icono propios.
-- 🚧 **Fase 4 — Discografía**: primera entrega — listado (grid/lista, filtro, orden) y
-  detalle con tracklist, **solo lectura**. Pendiente: menú de Cuenta como desplegable,
+- 🚧 **Fase 4 — Discografía**: listado (grid/lista, filtro, orden) y detalle con
+  tracklist, **solo lectura**; cabecera común con menú de Cuenta desplegable; perfil de
+  usuario editable con avatar; gestión de administradores para superadmins. Pendiente:
   soporte real de macOS y edición de discos para administradores.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
@@ -68,6 +69,7 @@ ommadawn/
 │       ├── TokenStore.swift           # tokens en Keychain (actor)
 │       ├── TokenRefresher.swift       # renovación coordinada (single-flight)
 │       ├── AuthMiddleware.swift       # Bearer + (401 → refresh → reintento)
+│       ├── AvatarUpload.swift         # sube el avatar con el Content-Type real
 │       ├── DateTranscoding.swift      # fechas ISO8601 con microsegundos
 │       └── Models.swift               # alias de conveniencia (User)
 │
@@ -75,13 +77,19 @@ ommadawn/
 ├── ommadawn/                          # 📱 App
 │   ├── ommadawnApp.swift              # @main · posee la AuthSession
 │   ├── ContentView.swift              # router según el estado de sesión
-│   ├── RootTabView.swift              # shell tras el login: TabView Discografía/Cuenta
+│   ├── RootTabView.swift              # shell tras el login: cabecera común + TabView
 │   ├── LoginView.swift
 │   ├── Auth/
-│   │   ├── AuthSession.swift          # @Observable: estado + login/registro/logout
+│   │   ├── AuthSession.swift          # @Observable: sesión + perfil + avatar + logout
 │   │   └── RegisterView.swift
 │   ├── Account/
-│   │   └── AccountView.swift          # saludo, cerrar sesión, apariencia
+│   │   ├── AccountMenu.swift          # menú desplegable (nombre, apariencia, admin, logout)
+│   │   ├── AccountProfileView.swift   # hoja de perfil: avatar + datos editables
+│   │   ├── AccountAvatarView.swift    # avatar circular reutilizable
+│   │   └── User+Presentation.swift    # displayName, avatarURL
+│   ├── Admin/                         # gestión de administradores (solo superadmin)
+│   │   ├── AdminStore.swift
+│   │   └── AdminUsersView.swift
 │   ├── Discography/                   # Fase 4: catálogo (solo lectura)
 │   │   ├── DiscographyStore.swift
 │   │   ├── ReleaseListView.swift
@@ -175,7 +183,30 @@ Cómo está montado:
   servidor en segundo plano.
 - Login por **usuario _o_ email** (campo `username_or_email`).
 
-Endpoints de auth: `register`, `login`, `refresh`, `logout`, `me`.
+Endpoints de auth: `register`, `login`, `refresh`, `logout`, `me` (`GET`/`PATCH`),
+`me/avatar` (`POST`/`DELETE`), `users` (`GET`, superadmin), `users/{id}` (`PATCH`,
+superadmin).
+
+---
+
+## Cuenta, perfil y administración
+
+`AccountMenu` cuelga de la cabecera común de la app (wordmark centrado + icono de
+cuenta a la derecha, por encima del `TabView`, fija al navegar). Desde ahí:
+
+- **Perfil** (`AccountProfileView`): avatar (`PhotosPicker` para subir/cambiar, o
+  quitarlo) y datos editables — nombre, país, ciudad, fecha de nacimiento — vía
+  `PATCH /auth/me`. Un campo se puede rellenar pero no vaciar desde aquí todavía (el
+  PATCH de la API es parcial: un campo ausente no se toca).
+- **Administración** (`AdminUsersView`, solo visible si `is_super_admin`): lista de
+  usuarios con un interruptor para promover o degradar a administrador. No se puede
+  nombrar un superadmin desde la app — sigue siendo solo por base de datos.
+- **Detalle técnico**: el contrato declara el fichero del avatar como
+  `contentMediaType: application/octet-stream`, y el cliente generado usaría ese valor
+  literal como `Content-Type` del *part* multipart — pero la API valida el tipo real de
+  la imagen contra ese header. `AvatarUpload.swift` (en `OmmadawnAPI`) construye el
+  *part* a mano con el `Content-Type` real, detectado por los primeros bytes del
+  fichero.
 
 ---
 
@@ -246,7 +277,7 @@ API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha (lectura ✅; pendiente: menú de Cuenta, macOS real, edición admin) |
+| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha (lectura ✅, menú de Cuenta ✅, perfil con avatar ✅, gestión de admins ✅; pendiente: macOS real, edición de discos) |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar. | Pendiente |

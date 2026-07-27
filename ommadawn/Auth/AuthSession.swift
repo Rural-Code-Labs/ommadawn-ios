@@ -35,6 +35,15 @@ enum RegisterError: Error {
     case network(Error)
 }
 
+/// Motivos por los que editar el perfil o el avatar puede fallar.
+enum ProfileError: Error {
+    case invalidData      // 422 — datos rechazados o formato de imagen no soportado
+    case imageTooLarge    // 413 — avatar por encima de 10 MB
+    case sessionExpired   // 401
+    case unexpected(Int)
+    case network(Error)
+}
+
 @MainActor
 @Observable
 final class AuthSession {
@@ -151,6 +160,77 @@ final class AuthSession {
             throw RegisterError.registeredButLoginFailed
         } catch {
             throw RegisterError.network(error)
+        }
+    }
+
+    /// Edita los campos de perfil presentes (`nil` = no tocar ese campo; PATCH
+    /// real, igual que en discografía). No toca username/email/contraseña/avatar.
+    func updateProfile(fullName: String?, country: String?, city: String?, birthDate: String?) async throws {
+        do {
+            let output = try await client.update_me_api_v1_auth_me_patch(
+                .init(body: .json(.init(
+                    full_name: fullName,
+                    country: country,
+                    city: city,
+                    birth_date: birthDate
+                )))
+            )
+            switch output {
+            case .ok(let ok):
+                state = .signedIn(try ok.body.json)
+            case .unauthorized:
+                throw ProfileError.sessionExpired
+            case .unprocessableContent:
+                throw ProfileError.invalidData
+            case .undocumented(let statusCode, _):
+                throw ProfileError.unexpected(statusCode)
+            }
+        } catch let error as ProfileError {
+            throw error
+        } catch {
+            throw ProfileError.network(error)
+        }
+    }
+
+    /// Sube (o sustituye) el avatar del usuario autenticado.
+    func uploadAvatar(data: Data, mimeType: String, filename: String) async throws {
+        do {
+            let output = try await client.uploadAvatar(data: data, mimeType: mimeType, filename: filename)
+            switch output {
+            case .ok(let ok):
+                state = .signedIn(try ok.body.json)
+            case .unauthorized:
+                throw ProfileError.sessionExpired
+            case .contentTooLarge:
+                throw ProfileError.imageTooLarge
+            case .unprocessableContent:
+                throw ProfileError.invalidData
+            case .undocumented(let statusCode, _):
+                throw ProfileError.unexpected(statusCode)
+            }
+        } catch let error as ProfileError {
+            throw error
+        } catch {
+            throw ProfileError.network(error)
+        }
+    }
+
+    /// Borra el avatar del usuario autenticado, si tenía uno.
+    func deleteAvatar() async throws {
+        do {
+            let output = try await client.delete_avatar_api_v1_auth_me_avatar_delete(.init())
+            switch output {
+            case .ok(let ok):
+                state = .signedIn(try ok.body.json)
+            case .unauthorized:
+                throw ProfileError.sessionExpired
+            case .undocumented(let statusCode, _):
+                throw ProfileError.unexpected(statusCode)
+            }
+        } catch let error as ProfileError {
+            throw error
+        } catch {
+            throw ProfileError.network(error)
         }
     }
 
