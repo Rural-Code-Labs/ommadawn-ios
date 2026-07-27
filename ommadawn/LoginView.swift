@@ -8,6 +8,11 @@
 //  Al iniciar sesión con éxito, `AuthSession` cambia de estado y la vista
 //  raíz (ContentView) enruta fuera de aquí sola: esta pantalla no navega.
 //
+//  Usuario/email y contraseña van en una única tarjeta (con separador) en
+//  vez de dos cajas sueltas, y el botón principal usa `BrandGray` (el mismo
+//  gris del logo y el wordmark) en vez del azul de sistema, para que el
+//  color de marca aparezca también en la acción principal.
+//
 
 import SwiftUI
 
@@ -25,6 +30,11 @@ struct LoginView: View {
     @State private var errorMessage: String?
     /// Controla la presentación de la hoja de registro.
     @State private var showingRegister = false
+    /// El botón de Google es solo un hueco visual todavía: falta el endpoint
+    /// en la API (verificar el ID token de Google y emitir los tokens propios
+    /// — ver LoginError/RegisterError para el patrón que seguiría una vez
+    /// exista).
+    @State private var showingGoogleComingSoon = false
 
     /// Solo evita enviar formularios vacíos. La validación de verdad
     /// (credenciales correctas) la hace el servidor.
@@ -33,28 +43,35 @@ struct LoginView: View {
     }
 
     var body: some View {
-        VStack(spacing: 32) {
-            header
+        ScrollView {
+            VStack(spacing: 28) {
+                header
 
-            VStack(spacing: 16) {
-                identifierField
-                passwordField
-                if let errorMessage {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .transition(.opacity)
+                VStack(spacing: 12) {
+                    credentialsCard
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .transition(.opacity)
+                    }
                 }
+
+                loginButton
+
+                orDivider
+
+                googleSignInButton
+
+                registerLink
             }
-
-            loginButton
-
-            registerLink
+            .padding(.horizontal, 24)
+            .padding(.top, 48)
+            .padding(.bottom, 24)
+            .frame(maxWidth: 420) // en iPad/Mac no queremos campos gigantes
+            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 24)
-        .frame(maxWidth: 420) // en iPad/Mac no queremos campos gigantes
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .disabled(isSubmitting)
         .animation(.default, value: errorMessage)
     }
@@ -62,35 +79,54 @@ struct LoginView: View {
     // MARK: - Secciones
 
     private var header: some View {
-        VStack(spacing: 8) {
-            BrandMark(size: 150)
+        VStack(spacing: 6) {
+            BrandMark(size: 110)
                 .opacity(isSubmitting ? 0.4 : 1)
 
-            VStack(spacing: 2) {
-                Text("Ommadawn")
-                    .font(.custom("SnellRoundhand-Bold", size: 46))
-                    .foregroundStyle(Color("BrandGray"))
+            Text("Ommadawn")
+                .font(.custom("Didot-Italic", size: 34))
+                .tracking(1)
+                .foregroundStyle(Color("BrandGray"))
 
-                Text("El universo sonoro de Mike Oldfield")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+            Text("El universo sonoro de Mike Oldfield")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
     }
 
-    private var identifierField: some View {
-        TextField("Usuario o email", text: $usernameOrEmail)
-            .textContentType(.username)
-            .autocorrectionDisabled()
-            #if os(iOS)
-            .textInputAutocapitalization(.never)
-            #endif
-            .textFieldStyle(.roundedBorder)
-            .onChange(of: usernameOrEmail) { errorMessage = nil }
+    /// Usuario/email y contraseña en una única tarjeta, con un separador
+    /// entre ambos en vez de dos cajas sueltas — se lee como un solo bloque
+    /// de "credenciales", no dos campos independientes.
+    private var credentialsCard: some View {
+        VStack(spacing: 0) {
+            usernameField
+            Divider().padding(.leading, 48)
+            passwordField
+        }
+        .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var usernameField: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "person")
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
+            TextField("Usuario o email", text: $usernameOrEmail)
+                .textContentType(.username)
+                .autocorrectionDisabled()
+                #if os(iOS)
+                .textInputAutocapitalization(.never)
+                #endif
+                .onChange(of: usernameOrEmail) { errorMessage = nil }
+        }
+        .padding(16)
     }
 
     private var passwordField: some View {
-        HStack {
+        HStack(spacing: 12) {
+            Image(systemName: "lock")
+                .foregroundStyle(.secondary)
+                .frame(width: 20)
             Group {
                 if isPasswordVisible {
                     TextField("Contraseña", text: $password)
@@ -115,25 +151,79 @@ struct LoginView: View {
             .buttonStyle(.plain)
             .accessibilityLabel(isPasswordVisible ? "Ocultar contraseña" : "Mostrar contraseña")
         }
-        .padding(8)
-        .background(.quaternary, in: .rect(cornerRadius: 8))
+        .padding(16)
     }
 
+    /// Capsule en BrandGray en vez de `.borderedProminent` (azul de
+    /// sistema) — la acción principal lleva el color de la marca.
     private var loginButton: some View {
         Button {
             Task { await submit() }
         } label: {
             if isSubmitting {
                 ProgressView()
+                    .tint(.white)
                     .frame(maxWidth: .infinity)
             } else {
                 Text("Entrar")
+                    .fontWeight(.semibold)
                     .frame(maxWidth: .infinity)
             }
         }
-        .buttonStyle(.borderedProminent)
-        .controlSize(.large)
+        .foregroundStyle(.white)
+        .padding(.vertical, 14)
+        .background(Color("BrandGray"), in: .capsule)
+        .buttonStyle(.plain)
+        .opacity(isFormValid ? 1 : 0.4)
         .disabled(!isFormValid || isSubmitting)
+    }
+
+    private var orDivider: some View {
+        HStack(spacing: 8) {
+            Rectangle().frame(height: 1).foregroundStyle(.quaternary)
+            Text("o")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+            Rectangle().frame(height: 1).foregroundStyle(.quaternary)
+        }
+    }
+
+    /// Blanco con la "G" a color (sin reproducir el logotipo exacto, solo su
+    /// paleta). Todavía no hace nada: falta el endpoint en la API para
+    /// verificar el ID token de Google y emitir los tokens propios.
+    private var googleSignInButton: some View {
+        Button {
+            showingGoogleComingSoon = true
+        } label: {
+            HStack(spacing: 10) {
+                googleG
+                Text("Continuar con Google")
+                    .fontWeight(.medium)
+            }
+            .foregroundStyle(.black)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 14)
+            .background(.white, in: .capsule)
+            .overlay {
+                Capsule().stroke(.black.opacity(0.15), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .alert("Próximamente", isPresented: $showingGoogleComingSoon) {
+            Button("Vale", role: .cancel) {}
+        } message: {
+            Text("El inicio de sesión con Google todavía no está disponible.")
+        }
+    }
+
+    /// La "G" de Google en degradado con sus cuatro colores de marca — un
+    /// guiño a la paleta, no una copia del logotipo real.
+    private var googleG: some View {
+        Text("G")
+            .font(.system(size: 20, weight: .bold))
+            .foregroundStyle(
+                AngularGradient(colors: [.red, .yellow, .green, .blue, .red], center: .center)
+            )
     }
 
     private var registerLink: some View {
