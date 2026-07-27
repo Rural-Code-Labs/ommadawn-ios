@@ -38,16 +38,12 @@ struct RegisterView: View {
                     TextField("Usuario", text: $username)
                         .textContentType(.username)
                         .autocorrectionDisabled()
-                        #if os(iOS)
                         .textInputAutocapitalization(.never)
-                        #endif
                     TextField("Email", text: $email)
                         .textContentType(.emailAddress)
                         .autocorrectionDisabled()
-                        #if os(iOS)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
-                        #endif
                 } footer: {
                     Text("El usuario debe tener entre 3 y 50 caracteres.")
                 }
@@ -86,9 +82,7 @@ struct RegisterView: View {
                 }
             }
             .navigationTitle("Crear cuenta")
-            #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
-            #endif
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { dismiss() }

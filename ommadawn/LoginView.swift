@@ -114,9 +114,7 @@ struct LoginView: View {
             TextField("Usuario o email", text: $usernameOrEmail)
                 .textContentType(.username)
                 .autocorrectionDisabled()
-                #if os(iOS)
                 .textInputAutocapitalization(.never)
-                #endif
                 .onChange(of: usernameOrEmail) { errorMessage = nil }
         }
         .padding(16)
@@ -136,9 +134,7 @@ struct LoginView: View {
             }
             .textContentType(.password)
             .autocorrectionDisabled()
-            #if os(iOS)
             .textInputAutocapitalization(.never)
-            #endif
             .onChange(of: password) { errorMessage = nil }
             .onSubmit { Task { await submit() } }
 

@@ -11,8 +11,12 @@ un catálogo de la obra de **Mike Oldfield** (discografía, conciertos, libros y
 secciones). La app **no tiene lógica de dominio ni base de datos propia**: presenta lo
 que sirve la API, que es la fuente de verdad.
 
-Primero **iOS**. El proyecto es multiplataforma (iOS, macOS, visionOS); Android será en
-el futuro con otra base de código.
+**iOS** (iPhone/iPad). Se descartó dar soporte a macOS/visionOS (27 jul 2026): el target
+llegó a compilar para macOS, pero además de las adaptaciones de UI (`navigationBarTitleDisplayMode`
+no existe en AppKit) hacía falta un entitlement de Keychain que exige un perfil de
+aprovisionamiento de equipo real — complejidad que no compensa para una app de aprendizaje
+que ya tiene claro que es, ante todo, un cliente de iPhone/iPad. Android será en el futuro
+con otra base de código.
 
 **Contexto de trabajo — importante:**
 - Es un proyecto **de aprendizaje**, pero con intención de **publicarse** y ser usado por
@@ -39,15 +43,10 @@ el futuro con otra base de código.
   (discografía: listado con grid/lista/filtro/orden y detalle con tracklist, **solo
   lectura**; cabecera común de la app con menú de Cuenta desplegable; perfil de usuario
   editable con avatar; gestión de administradores para superadmins). Ver plan abajo.
-- **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (iOS/macOS/visionOS),
+- **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
 - **Pendiente para cerrar Fase 4** (27 jul 2026):
-  1. **Soporte macOS real**: el target ya es multiplataforma de nombre, pero al
-     compilar para macOS falla — `navigationBarTitleDisplayMode` (UIKit) no existe en
-     AppKit. Aparece en `ReleaseDetailView`/`ReleaseListView`/`AccountProfileView`; hay
-     que revisar todo lo específico de iOS en las vistas nuevas y adaptarlo o
-     condicionarlo por plataforma.
-  2. Edición de discos (crear/editar obra, edición, temas) cuando el usuario
+  1. Edición de discos (crear/editar obra, edición, temas) cuando el usuario
      autenticado es admin — la API ya soporta ese CRUD (`require_admin`), falta la UI.
      (Distinto de "gestión de administradores", ya hecha — ver abajo: esto es editar el
      *catálogo*, no promover usuarios).
@@ -229,7 +228,7 @@ cuelga del icono de cuenta en `AppHeaderBar` (ver arriba), con el nombre del usu
 
 ```
 ommadawn/
-├── ommadawn.xcodeproj/          # Proyecto Xcode (multiplataforma)
+├── ommadawn.xcodeproj/          # Proyecto Xcode (iOS: iPhone/iPad)
 ├── ommadawn/                    # Código de la app
 │   ├── ommadawnApp.swift        # @main · posee la AuthSession
 │   ├── ContentView.swift        # Vista raíz: enruta según el estado de sesión
@@ -361,10 +360,10 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 
 | Fase | Contenido | Estado |
 |---|---|---|
-| **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca (plantilla). | ✅ Hecha |
+| **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, menú de Cuenta ✅, perfil con avatar ✅, gestión de admins ✅; pendiente: soporte macOS real, edición de discos para admin |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, menú de Cuenta ✅, perfil con avatar ✅, gestión de admins ✅; pendiente: edición de discos para admin |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |
