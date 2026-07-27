@@ -36,19 +36,21 @@ el futuro con otra base de código.
 - **Estado**: **Fase 3 hecha** (autenticación completa: registro, login por
   `username_or_email`, sesión persistente en Keychain, renovación automática — reactiva
   ante `401` y **proactiva** usando `expires_in` — y logout) y **Fase 4 en marcha**
-  (discografía: primera entrega ya en `main` — listado con grid/lista/filtro/orden y
-  detalle con tracklist, **solo lectura**). Ver plan abajo.
+  (discografía: listado con grid/lista/filtro/orden y detalle con tracklist, **solo
+  lectura**; cabecera común de la app con menú de Cuenta desplegable; perfil de usuario
+  editable con avatar; gestión de administradores para superadmins). Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (iOS/macOS/visionOS),
   Swift 5, Xcode 26.
-- **Pendiente acordado para seguir con Fase 4** (26 jul 2026, sin empezar):
-  1. Sacar "Cuenta" del `TabView` y convertirla en menú desplegable arriba a la
-     izquierda (cerrar sesión + opciones de cuenta), en vez de pestaña propia.
-  2. **Soporte macOS real**: el target ya es multiplataforma de nombre, pero al
+- **Pendiente para cerrar Fase 4** (27 jul 2026):
+  1. **Soporte macOS real**: el target ya es multiplataforma de nombre, pero al
      compilar para macOS falla — `navigationBarTitleDisplayMode` (UIKit) no existe en
-     AppKit. Aparece en `ReleaseDetailView`/`ReleaseListView`; hay que revisar todo lo
-     específico de iOS en las vistas nuevas y adaptarlo o condicionarlo por plataforma.
-  3. Edición de discos (crear/editar obra, edición, temas) cuando el usuario
+     AppKit. Aparece en `ReleaseDetailView`/`ReleaseListView`/`AccountProfileView`; hay
+     que revisar todo lo específico de iOS en las vistas nuevas y adaptarlo o
+     condicionarlo por plataforma.
+  2. Edición de discos (crear/editar obra, edición, temas) cuando el usuario
      autenticado es admin — la API ya soporta ese CRUD (`require_admin`), falta la UI.
+     (Distinto de "gestión de administradores", ya hecha — ver abajo: esto es editar el
+     *catálogo*, no promover usuarios).
 
 ---
 
@@ -161,16 +163,65 @@ admin). Consume `/api/v1/discography/*` de la API (`Release` → `Edition` → `
   (`displayEdition`, `coverURL`, `ReleaseType.displayName` en español) — viven en el
   target de la app, no en `OmmadawnAPI`, porque son decisiones de cómo se muestra el
   catálogo, no del contrato en sí.
-- **`RootTabView`**: sustituye al `HomeView` placeholder. `TabView` con pestañas
-  Discografía / Cuenta (la de Cuenta se convertirá en menú desplegable, ver pendientes
-  arriba). Cada pestaña con su propio `NavigationStack`.
-- **`AccountView`** (antes `HomeView`): saludo + cerrar sesión + selector de apariencia
-  (`AppearancePicker`, Sistema/Claro/Oscuro) — el selector vivía como botón flotante
-  arriba a la derecha en toda la app; ahora es una opción de Cuenta.
+- **`RootTabView`**: shell de navegación tras el login. `TabView` con pestañas
+  Discografía / Tours (esta última un placeholder hasta la Fase 5). Por encima del
+  `TabView` vive `AppHeaderBar`, una cabecera **común a toda la app** (no es el
+  `navigationBar` de ninguna pestaña, así que no se mueve al navegar dentro de ellas):
+  wordmark "Ommadawn" centrado + `AccountMenu` superpuesto a la derecha. Las vistas raíz
+  de cada pestaña no ponen su propio `navigationTitle` (la pestaña activa ya dice la
+  sección); las vistas de detalle sí, y aparece debajo de la cabecera como si
+  continuara el título de la app.
+- Los controles de filtro/orden (con dirección ascendente/descendente) y cambio de
+  vista de `ReleaseListView` son un *capsule* flotante cerca del borde inferior
+  derecho, no toolbar items.
 
 **No se llama `Image` a secas** el alias de `ImageRead` en `Models.swift` (es
 `ReleaseImage`): colisionaría con `SwiftUI.Image` en cualquier vista que importe ambos
 módulos.
+
+---
+
+## Cuenta: menú, perfil y administración (Fase 4)
+
+`AccountMenu` sustituye a la antigua pestaña "Cuenta": es un `Menu` desplegable que
+cuelga del icono de cuenta en `AppHeaderBar` (ver arriba), con el nombre del usuario
+(pulsable, abre el perfil), el selector de apariencia, "Administrar usuarios" (solo si
+`user.is_super_admin`) y cerrar sesión.
+
+- **`Account/User+Presentation.swift`**: `displayName` (`full_name` si lo hay, si no
+  `username`) y `avatarURL` (`URL?` desde `avatar_url`) como extensiones de `User` —
+  presentación, no contrato, mismo criterio que `Release+Presentation.swift`.
+- **`Account/AccountAvatarView`**: el avatar en un círculo (o el símbolo genérico de
+  persona si no hay foto). Se usa tanto en el icono pequeño de `AccountMenu` como en el
+  preview grande de `AccountProfileView`.
+- **`Account/AccountProfileView`**: hoja de perfil — avatar (`PhotosPicker` para
+  subir/cambiar, botón para quitar) y datos editables (nombre, país, ciudad, fecha de
+  nacimiento) vía `PATCH /auth/me`. Lee el usuario **en vivo** desde `AuthSession` (no
+  por parámetro) para que el avatar se refresque solo tras subir/quitar una foto; los
+  campos del formulario se siembran **una vez** al aparecer, para no perder lo que la
+  persona esté escribiendo si el avatar cambia mientras tanto.
+  - **Limitación conocida**: un campo se puede rellenar pero no "vaciar" desde aquí (un
+    campo vacío no se envía, por cómo funciona el PATCH parcial de la API). Editarlo
+    para poder borrarlo del todo queda pendiente si hace falta.
+- **`AuthSession`**: gana `updateProfile`, `uploadAvatar` y `deleteAvatar`. Las tres
+  actualizan `state` con el `UserRead` que devuelve la API, así que cualquier vista que
+  lea el usuario desde `AuthSession` (el icono de `AppHeaderBar` incluido) se refresca
+  sola — no hace falta replumbing manual.
+- **`OmmadawnAPI/Sources/OmmadawnAPI/AvatarUpload.swift`**: sube el avatar construyendo
+  el *part* multipart **a mano**, no con el case `.file` que genera el plugin. El
+  contrato declara el fichero como `contentMediaType: application/octet-stream`, y el
+  generador usa ESE valor literal como `Content-Type` del *part* — pero la API valida
+  el tipo real de la imagen (`image/jpeg`/`png`/`webp`) contra ese header, así que
+  subiendo por el case generado la API respondería 422 siempre, fuera cual fuera la
+  imagen. Se construye el *part* con el case `.undocumented` (`MultipartRawPart`) para
+  poner el `Content-Type` real, detectado por los primeros bytes del fichero (magic
+  numbers) ya que `PhotosPicker` no expone el tipo MIME de forma directa.
+- **`Admin/AdminStore`** y **`Admin/AdminUsersView`**: gestión de administradores,
+  mismo patrón que `DiscographyStore` (envuelve el `Client` de `AuthSession`). Lista
+  usuarios (`GET /auth/users`) y promueve/degrada a admin (`PATCH /auth/users/{id}`) —
+  ambos endpoints exigen **superadministrador** del lado de la API; el `is_super_admin`
+  que gatea la entrada del menú en la app es solo UI, no la única barrera. No se puede
+  tocar `is_super_admin` desde la app: nombrar un superadmin sigue siendo solo por BD.
 
 ---
 
@@ -182,13 +233,19 @@ ommadawn/
 ├── ommadawn/                    # Código de la app
 │   ├── ommadawnApp.swift        # @main · posee la AuthSession
 │   ├── ContentView.swift        # Vista raíz: enruta según el estado de sesión
-│   ├── RootTabView.swift        # Shell tras el login: TabView Discografía/Cuenta
+│   ├── RootTabView.swift        # Shell tras el login: cabecera común + TabView
 │   ├── LoginView.swift
 │   ├── Auth/
-│   │   ├── AuthSession.swift    # @Observable: estado + login/registro/logout
+│   │   ├── AuthSession.swift    # @Observable: sesión + perfil + avatar + logout
 │   │   └── RegisterView.swift
 │   ├── Account/
-│   │   └── AccountView.swift    # Saludo, cerrar sesión, selector de apariencia
+│   │   ├── AccountMenu.swift          # Menú desplegable (nombre, apariencia, admin, logout)
+│   │   ├── AccountProfileView.swift   # Hoja de perfil: avatar + datos editables
+│   │   ├── AccountAvatarView.swift    # Avatar circular reutilizable
+│   │   └── User+Presentation.swift    # displayName, avatarURL
+│   ├── Admin/                    # Gestión de administradores (solo superadmin)
+│   │   ├── AdminStore.swift
+│   │   └── AdminUsersView.swift
 │   ├── Discography/              # Fase 4: catálogo (solo lectura por ahora)
 │   │   ├── DiscographyStore.swift
 │   │   ├── ReleaseListView.swift
@@ -307,7 +364,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle en lectura ✅; pendiente: menú de Cuenta, soporte macOS, edición admin |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, menú de Cuenta ✅, perfil con avatar ✅, gestión de admins ✅; pendiente: soporte macOS real, edición de discos para admin |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |

@@ -2,8 +2,9 @@
 //  AccountMenu.swift
 //  ommadawn
 //
-//  Menú desplegable de cuenta: saludo, apariencia y cerrar sesión.
-//  Reemplaza la pestaña "Cuenta" del TabView.
+//  Menú desplegable de cuenta: nombre (abre el perfil), apariencia y cerrar
+//  sesión. Reemplaza la pestaña "Cuenta" del TabView. Si el usuario es
+//  superadministrador, añade acceso a la gestión de administradores.
 //
 
 import SwiftUI
@@ -14,16 +15,17 @@ struct AccountMenu: View {
     @Environment(AuthSession.self) private var session
     @AppStorage("appearance") private var theme: AppTheme = .system
 
-    private var displayName: String {
-        if let name = user.full_name, !name.isEmpty { return name }
-        return user.username
-    }
+    @State private var showingProfile = false
+    @State private var showingAdminUsers = false
 
     var body: some View {
         Menu {
             Section {
-                Label(displayName, systemImage: "person.crop.circle")
-                    .disabled(true)
+                Button {
+                    showingProfile = true
+                } label: {
+                    Label(user.displayName, systemImage: "person.crop.circle")
+                }
             }
 
             Section {
@@ -31,6 +33,16 @@ struct AccountMenu: View {
                     Text("Sistema").tag(AppTheme.system)
                     Text("Claro").tag(AppTheme.light)
                     Text("Oscuro").tag(AppTheme.dark)
+                }
+            }
+
+            if user.is_super_admin {
+                Section {
+                    Button {
+                        showingAdminUsers = true
+                    } label: {
+                        Label("Administrar usuarios", systemImage: "person.2.badge.gearshape")
+                    }
                 }
             }
 
@@ -42,10 +54,15 @@ struct AccountMenu: View {
                 }
             }
         } label: {
-            Image(systemName: "person.crop.circle")
-                .font(.system(size: 18))
+            AccountAvatarView(user: user, size: 18)
         }
         .accessibilityLabel("Cuenta")
+        .sheet(isPresented: $showingProfile) {
+            AccountProfileView()
+        }
+        .sheet(isPresented: $showingAdminUsers) {
+            AdminUsersView()
+        }
     }
 }
 
@@ -57,6 +74,7 @@ struct AccountMenu: View {
         full_name: "Rafa García",
         is_active: true,
         is_admin: false,
+        is_super_admin: false,
         created_at: .now
     ))
     .environment(AuthSession(initialState: .signedOut))

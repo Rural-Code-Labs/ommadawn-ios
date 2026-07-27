@@ -83,6 +83,7 @@ private struct ToursPlaceholderView: View {
         email: "rafa@example.com",
         is_active: true,
         is_admin: false,
+        is_super_admin: false,
         created_at: .now
     ))
     .environment(AuthSession(initialState: .signedOut))
