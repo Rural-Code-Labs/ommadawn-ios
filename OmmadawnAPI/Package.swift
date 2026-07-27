@@ -15,11 +15,10 @@ import PackageDescription
 
 let package = Package(
     name: "OmmadawnAPI",
-    // Mismos mínimos que la app (deployment target 26.5).
+    // Mismo mínimo que la app (deployment target 26.5). Solo iOS: la app es
+    // iPhone/iPad, no multiplataforma.
     platforms: [
         .iOS(.v26),
-        .macOS(.v26),
-        .visionOS(.v26),
     ],
     products: [
         .library(name: "OmmadawnAPI", targets: ["OmmadawnAPI"]),

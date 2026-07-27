@@ -93,17 +93,11 @@ public actor TokenStore {
     /// determinan service + account (+ grupo de acceso). Sin flags de retorno
     /// ni accesibilidad: cada llamada usa su propio diccionario.
     private var identityQuery: [CFString: Any] {
-        var query: [CFString: Any] = [
+        [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
             kSecAttrAccount: account,
         ]
-        #if os(macOS)
-        // En macOS hay que pedir explícitamente el keychain con protección de
-        // datos (el de estilo iOS); si no, se usa el legacy basado en archivo.
-        query[kSecUseDataProtectionKeychain] = true
-        #endif
-        return query
     }
 
     // MARK: Guardar
@@ -174,13 +168,10 @@ public actor TokenStore {
     /// justo lo que queremos (limpieza total al cerrar sesión), pero en otros
     /// contextos una consulta poco específica borraría de más.
     public func clear() throws {
-        var query: [CFString: Any] = [
+        let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
             kSecAttrService: service,
         ]
-        #if os(macOS)
-        query[kSecUseDataProtectionKeychain] = true
-        #endif
 
         let status = SecItemDelete(query as CFDictionary)
         // Que no hubiera nada que borrar es un final válido, no un error.

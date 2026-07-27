@@ -10,16 +10,16 @@ app lo presenta.
 > publicarse de verdad. Se avanza en **fases pequeñas y entendibles**,
 > priorizando el *por qué* de cada decisión sobre la velocidad.
 
-Primero **iOS**; el objetivo es multiplataforma (iOS, macOS, visionOS) — el target de
-Xcode ya lo es de nombre, pero el soporte real de macOS/visionOS todavía está pendiente
-de trabajo (hay APIs de UIKit-only colándose en las vistas nuevas). Android queda para
-el futuro con otra base de código.
+**iOS** (iPhone/iPad). Se evaluó dar soporte a macOS/visionOS y se descartó: además de
+las adaptaciones de UI necesarias, macOS exige un entitlement de Keychain que a su vez
+requiere un perfil de aprovisionamiento de equipo real — complejidad que no compensa
+para esta app. Android queda para el futuro con otra base de código.
 
 ---
 
 ## Estado
 
-- ✅ **Fase 1 — Esqueleto**: proyecto Xcode multiplataforma que arranca.
+- ✅ **Fase 1 — Esqueleto**: proyecto Xcode iOS que arranca.
 - ✅ **Fase 2 — Capa de red**: cliente HTTP tipado generado desde el contrato.
 - ✅ **Fase 3 — Autenticación**: registro, login, tokens en Keychain, renovación
   automática (reactiva ante `401` y proactiva con `expires_in`) y logout.
@@ -27,7 +27,7 @@ el futuro con otra base de código.
 - 🚧 **Fase 4 — Discografía**: listado (grid/lista, filtro, orden) y detalle con
   tracklist, **solo lectura**; cabecera común con menú de Cuenta desplegable; perfil de
   usuario editable con avatar; gestión de administradores para superadmins. Pendiente:
-  soporte real de macOS y edición de discos para administradores.
+  edición de discos para administradores.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -47,7 +47,7 @@ Ver el [plan por fases](#plan-por-fases) completo abajo.
 
 - **Repositorio**: [`Rural-Code-Labs/ommadawn-ios`](https://github.com/Rural-Code-Labs/ommadawn-ios)
 - **Bundle id**: `com.ruralcodelabs.ommadawn`
-- **Plataformas**: iOS · macOS · visionOS (deployment target 26.5)
+- **Plataformas**: iOS — iPhone/iPad (deployment target 26.5)
 - **Organización**: [Rural-Code-Labs](https://github.com/Rural-Code-Labs) (la misma que la API)
 
 ---
@@ -273,11 +273,11 @@ API ya lo expone.
 
 | Fase | Contenido | Estado |
 |---|---|---|
-| **1 — Esqueleto** | Proyecto Xcode multiplataforma SwiftUI que arranca. | ✅ Hecha |
+| **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca. | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha (lectura ✅, menú de Cuenta ✅, perfil con avatar ✅, gestión de admins ✅; pendiente: macOS real, edición de discos) |
+| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha (lectura ✅, menú de Cuenta ✅, perfil con avatar ✅, gestión de admins ✅; pendiente: edición de discos) |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar. | Pendiente |
