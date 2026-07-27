@@ -54,7 +54,7 @@ struct AccountMenu: View {
                 }
             }
         } label: {
-            AccountAvatarView(user: user, size: 18)
+            AccountAvatarView(user: user, size: 32)
         }
         .accessibilityLabel("Cuenta")
         .sheet(isPresented: $showingProfile) {

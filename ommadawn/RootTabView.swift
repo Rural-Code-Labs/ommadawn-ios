@@ -52,7 +52,8 @@ private struct AppHeaderBar: View {
         HStack {
             Spacer()
             Text("Ommadawn")
-                .font(.custom("SnellRoundhand-Bold", size: 28))
+                .font(.custom("Didot-Italic", size: 32))
+                .tracking(0.5)
                 .foregroundStyle(Color("BrandGray"))
             Spacer()
         }
