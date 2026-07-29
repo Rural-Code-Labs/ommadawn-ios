@@ -13,10 +13,8 @@ import OmmadawnAPI
 struct AccountMenu: View {
     let user: User
     @Environment(AuthSession.self) private var session
-    @AppStorage("appearance") private var theme: AppTheme = .system
 
     @State private var showingProfile = false
-    @State private var showingAdminUsers = false
 
     var body: some View {
         Menu {
@@ -24,25 +22,7 @@ struct AccountMenu: View {
                 Button {
                     showingProfile = true
                 } label: {
-                    Label(user.displayName, systemImage: "person.crop.circle")
-                }
-            }
-
-            Section {
-                Picker("Apariencia", selection: $theme) {
-                    Text("Sistema").tag(AppTheme.system)
-                    Text("Claro").tag(AppTheme.light)
-                    Text("Oscuro").tag(AppTheme.dark)
-                }
-            }
-
-            if user.is_super_admin {
-                Section {
-                    Button {
-                        showingAdminUsers = true
-                    } label: {
-                        Label("Administrar usuarios", systemImage: "person.2.badge.gearshape")
-                    }
+                    Label("Editar perfil", systemImage: "person.crop.circle")
                 }
             }
 
@@ -60,9 +40,6 @@ struct AccountMenu: View {
         .sheet(isPresented: $showingProfile) {
             AccountProfileView()
         }
-        .sheet(isPresented: $showingAdminUsers) {
-            AdminUsersView()
-        }
     }
 }
 
@@ -72,6 +49,7 @@ struct AccountMenu: View {
         username: "rafatest",
         email: "rafa@example.com",
         full_name: "Rafa García",
+        theme_preference: .system,
         is_active: true,
         is_admin: false,
         is_super_admin: false,
