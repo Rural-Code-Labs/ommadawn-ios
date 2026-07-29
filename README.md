@@ -25,9 +25,10 @@ para esta app. Android queda para el futuro con otra base de código.
   automática (reactiva ante `401` y proactiva con `expires_in`) y logout.
 - ✅ **Identidad visual**: logo, wordmark e icono propios.
 - 🚧 **Fase 4 — Discografía**: listado (grid/lista, filtro, orden) y detalle con
-  tracklist, **solo lectura**; cabecera común con menú de Cuenta desplegable; perfil de
-  usuario editable con avatar; gestión de administradores para superadmins. Pendiente:
-  edición de discos para administradores.
+  tracklist, **solo lectura**; cabecera con avatar a la izquierda y engranaje de ajustes
+  a la derecha; perfil de usuario editable con avatar; ajustes de apariencia sincronizados
+  con el servidor; gestión de administradores para superadmins; pantalla "Acerca de".
+  Pendiente: edición de discos para administradores.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -83,22 +84,25 @@ ommadawn/
 │   │   ├── AuthSession.swift          # @Observable: sesión + perfil + avatar + logout
 │   │   └── RegisterView.swift
 │   ├── Account/
-│   │   ├── AccountMenu.swift          # menú desplegable (nombre, apariencia, admin, logout)
+│   │   ├── AccountMenu.swift          # menú desplegable (editar perfil, cerrar sesión)
 │   │   ├── AccountProfileView.swift   # hoja de perfil: avatar + datos editables
 │   │   ├── AccountAvatarView.swift    # avatar circular reutilizable
 │   │   └── User+Presentation.swift    # displayName, avatarURL
 │   ├── Admin/                         # gestión de administradores (solo superadmin)
 │   │   ├── AdminStore.swift
 │   │   └── AdminUsersView.swift
+│   ├── Settings/                      # ajustes de la app
+│   │   └── SettingsView.swift         # apariencia sincronizada con servidor + admin
 │   ├── Discography/                   # Fase 4: catálogo (solo lectura)
 │   │   ├── DiscographyStore.swift
 │   │   ├── ReleaseListView.swift
 │   │   ├── ReleaseDetailView.swift
 │   │   └── Release+Presentation.swift
 │   ├── Design/
-│   │   ├── BrandMark.swift            # el logo "O" como vista reutilizable
-│   │   └── AppTheme.swift             # apariencia (Sistema/Claro/Oscuro)
-│   └── Assets.xcassets/               # AppIcon, BrandGray, AccentColor
+│   │   ├── BrandMark.swift            # el logo "O" en Didot Italic como vista reutilizable
+│   │   ├── AppTheme.swift             # apariencia + extensión para sincronizar con API
+│   │   └── AboutView.swift            # pantalla "Acerca de" con logo Rural Code Labs
+│   └── Assets.xcassets/               # AppIcon, BrandGray, AccentColor, RuralCodeLabsLogo
 │
 ├── ommadawnTests/                     # Tests unitarios (Swift Testing)
 └── ommadawnUITests/                   # Tests de UI
@@ -191,16 +195,24 @@ superadmin).
 
 ## Cuenta, perfil y administración
 
-`AccountMenu` cuelga de la cabecera común de la app (wordmark centrado + icono de
-cuenta a la derecha, por encima del `TabView`, fija al navegar). Desde ahí:
+La cabecera de la app (fija por encima del `TabView`, no se mueve al navegar) tiene el
+**avatar circular a la izquierda** (despliega `AccountMenu`) y el **engranaje a la
+derecha** (abre `SettingsView`). Desde ahí:
 
+- **AccountMenu**: solo "Editar perfil" y "Cerrar sesión". Las opciones de apariencia y
+  administración se movieron a Ajustes.
 - **Perfil** (`AccountProfileView`): avatar (`PhotosPicker` para subir/cambiar, o
-  quitarlo) y datos editables — nombre, país, ciudad, fecha de nacimiento — vía
-  `PATCH /auth/me`. Un campo se puede rellenar pero no vaciar desde aquí todavía (el
-  PATCH de la API es parcial: un campo ausente no se toca).
-- **Administración** (`AdminUsersView`, solo visible si `is_super_admin`): lista de
-  usuarios con un interruptor para promover o degradar a administrador. No se puede
-  nombrar un superadmin desde la app — sigue siendo solo por base de datos.
+  quitarlo) y datos — `username` no editable (primera fila) y campos editables con
+  etiqueta visible (nombre, país, ciudad, fecha de nacimiento) — vía `PATCH /auth/me`.
+  Un campo se puede rellenar pero no vaciar desde aquí todavía (el PATCH de la API es
+  parcial: un campo ausente no se toca).
+- **Ajustes** (`SettingsView`): selector de apariencia (Sistema/Claro/Oscuro)
+  sincronizado con `theme_preference` del servidor — al guardar se hace `PATCH /auth/me`
+  y al restaurar sesión se aplica la preferencia del servidor. Solo superadmins ven
+  además el acceso a "Administrar usuarios".
+- **Administración** (`AdminUsersView`, solo superadmin): lista de usuarios con
+  interruptor para promover/degradar a administrador. Nombrar superadmins sigue siendo
+  solo por base de datos.
 - **Detalle técnico**: el contrato declara el fichero del avatar como
   `contentMediaType: application/octet-stream`, y el cliente generado usaría ese valor
   literal como `Content-Type` del *part* multipart — pero la API valida el tipo real de
@@ -215,9 +227,11 @@ cuenta a la derecha, por encima del `TabView`, fija al navegar). Desde ahí:
 Marca propia de estilo caligráfico, montada como un pequeño sistema reutilizable y
 **sin empaquetar fuentes** (usa las que ya trae iOS):
 
-- **Logo**: la inicial **"O" de Didot** (alto contraste) inclinada, en carboncillo.
-  Vive en `Design/BrandMark.swift` y es la misma imagen que el icono de la app.
-- **Wordmark**: *Ommadawn* en **Snell Roundhand** (script).
+- **Logo**: la inicial **"O" de Didot Italic** (misma familia y estilo que el wordmark),
+  en carboncillo. Vive en `Design/BrandMark.swift` y es la misma imagen que el icono de
+  la app.
+- **Wordmark**: *Ommadawn* en **Didot Italic**.
+- **Logo de marca**: Rural Code Labs (claro/oscuro), usado en la pantalla "Acerca de".
 - **Color de marca**: `BrandGray` en el catálogo, adaptativo a claro/oscuro.
 - **Estilo general**: *minimal del sistema* — el resto de la UI se apoya en colores y
   materiales nativos de iOS.
@@ -277,7 +291,7 @@ API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha (lectura ✅, menú de Cuenta ✅, perfil con avatar ✅, gestión de admins ✅; pendiente: edición de discos) |
+| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha (lectura ✅, cabecera ✅, AccountMenu simplificado ✅, Settings con apariencia sincronizada ✅, perfil ✅, gestión de admins ✅, About ✅; pendiente: edición de discos para admin) |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar. | Pendiente |
