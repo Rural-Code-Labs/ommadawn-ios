@@ -87,7 +87,9 @@ final class AuthSession {
             return
         }
         do {
-            state = .signedIn(try await fetchProfile())
+            let user = try await fetchProfile()
+            applyTheme(from: user)
+            state = .signedIn(user)
         } catch {
             state = .signedOut
         }
@@ -111,7 +113,9 @@ final class AuthSession {
                 // Guarda tokens + caducidad (para el refresco proactivo).
                 try await tokenStore.save(AuthTokens(pair: pair))
                 // El login solo devuelve tokens; el perfil se pide aparte.
-                state = .signedIn(try await fetchProfile())
+                let user = try await fetchProfile()
+                applyTheme(from: user)
+                state = .signedIn(user)
 
             case .unauthorized:
                 throw LoginError.invalidCredentials
@@ -165,19 +169,28 @@ final class AuthSession {
 
     /// Edita los campos de perfil presentes (`nil` = no tocar ese campo; PATCH
     /// real, igual que en discografía). No toca username/email/contraseña/avatar.
-    func updateProfile(fullName: String?, country: String?, city: String?, birthDate: String?) async throws {
+    func updateProfile(
+        fullName: String? = nil,
+        country: String? = nil,
+        city: String? = nil,
+        birthDate: String? = nil,
+        themePreference: Components.Schemas.ThemePreference? = nil
+    ) async throws {
         do {
             let output = try await client.update_me_api_v1_auth_me_patch(
                 .init(body: .json(.init(
                     full_name: fullName,
                     country: country,
                     city: city,
-                    birth_date: birthDate
+                    birth_date: birthDate,
+                    theme_preference: themePreference
                 )))
             )
             switch output {
             case .ok(let ok):
-                state = .signedIn(try ok.body.json)
+                let user = try ok.body.json
+                applyTheme(from: user)
+                state = .signedIn(user)
             case .unauthorized:
                 throw ProfileError.sessionExpired
             case .unprocessableContent:
@@ -255,6 +268,13 @@ final class AuthSession {
     }
 
     // MARK: - Privado
+
+    /// Aplica la preferencia de apariencia guardada en el servidor a
+    /// `UserDefaults` (la fuente de verdad de `@AppStorage("appearance")`).
+    private func applyTheme(from user: User) {
+        let theme = AppTheme(from: user.theme_preference)
+        UserDefaults.standard.set(theme.rawValue, forKey: "appearance")
+    }
 
     private func fetchProfile() async throws -> User {
         let output = try await client.me_api_v1_auth_me_get(.init())

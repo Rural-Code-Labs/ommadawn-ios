@@ -50,9 +50,22 @@ struct AccountProfileView: View {
                 }
 
                 Section("Datos") {
-                    TextField("Nombre completo", text: $fullName)
-                    TextField("País", text: $country)
-                    TextField("Ciudad", text: $city)
+                    if let user {
+                        LabeledContent("Usuario", value: user.username)
+                            .foregroundStyle(.primary)
+                    }
+                    LabeledContent("Nombre completo") {
+                        TextField("", text: $fullName)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    LabeledContent("País") {
+                        TextField("", text: $country)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    LabeledContent("Ciudad") {
+                        TextField("", text: $city)
+                            .multilineTextAlignment(.trailing)
+                    }
                     Toggle("Fecha de nacimiento", isOn: $includesBirthDate.animation())
                     if includesBirthDate {
                         DatePicker("Fecha de nacimiento", selection: $birthDate, in: ...Date.now, displayedComponents: .date)
@@ -251,6 +264,7 @@ struct AccountProfileView: View {
             username: "rafatest",
             email: "rafa@example.com",
             full_name: "Rafa García",
+            theme_preference: .system,
             is_active: true,
             is_admin: false,
             is_super_admin: false,
