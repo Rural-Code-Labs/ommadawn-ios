@@ -18,6 +18,7 @@ import SwiftUI
 
 struct LoginView: View {
     @Environment(AuthSession.self) private var session
+    @AppStorage("appearance") private var theme: AppTheme = .system
 
     // Estado del formulario: local a la vista.
     // La API acepta username O email en el mismo campo (`username_or_email`).
@@ -35,6 +36,8 @@ struct LoginView: View {
     /// — ver LoginError/RegisterError para el patrón que seguiría una vez
     /// exista).
     @State private var showingGoogleComingSoon = false
+    /// Controla la presentación del panel "Acerca de".
+    @State private var showingAbout = false
 
     /// Solo evita enviar formularios vacíos. La validación de verdad
     /// (credenciales correctas) la hace el servidor.
@@ -72,11 +75,51 @@ struct LoginView: View {
             .frame(maxWidth: 420) // en iPad/Mac no queremos campos gigantes
             .frame(maxWidth: .infinity)
         }
+        .overlay(alignment: .topTrailing) {
+            HStack(spacing: 4) {
+                appearanceButton
+                infoButton
+            }
+        }
         .disabled(isSubmitting)
         .animation(.default, value: errorMessage)
     }
 
     // MARK: - Secciones
+
+    /// Cambio rápido de apariencia (Sistema → Claro → Oscuro → Sistema).
+    /// El selector completo con las tres opciones vive en el menú de Cuenta
+    /// una vez logueado; aquí es solo un atajo de un toque.
+    private var appearanceButton: some View {
+        Button {
+            theme = theme.next
+        } label: {
+            Image(systemName: theme.iconName)
+                .font(.system(size: 20))
+                .foregroundStyle(.primary)
+        }
+        .buttonStyle(.plain)
+        .padding()
+        .accessibilityLabel("Cambiar apariencia")
+    }
+
+    /// Abre "Acerca de". El mismo panel se reutilizará más adelante desde
+    /// el menú de Cuenta (botón "Acerca de"), ya logueado.
+    private var infoButton: some View {
+        Button {
+            showingAbout = true
+        } label: {
+            Image(systemName: "info.circle")
+                .font(.system(size: 20))
+                .foregroundStyle(.primary)
+        }
+        .buttonStyle(.plain)
+        .padding()
+        .accessibilityLabel("Acerca de")
+        .sheet(isPresented: $showingAbout) {
+            AboutView()
+        }
+    }
 
     private var header: some View {
         VStack(spacing: 6) {

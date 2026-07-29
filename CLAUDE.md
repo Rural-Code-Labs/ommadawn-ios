@@ -41,11 +41,13 @@ con otra base de código.
   `username_or_email`, sesión persistente en Keychain, renovación automática — reactiva
   ante `401` y **proactiva** usando `expires_in` — y logout) y **Fase 4 en marcha**
   (discografía: listado con grid/lista/filtro/orden y detalle con tracklist, **solo
-  lectura**; cabecera común de la app con menú de Cuenta desplegable; perfil de usuario
-  editable con avatar; gestión de administradores para superadmins). Ver plan abajo.
+  lectura**; cabecera común de la app con avatar a la izquierda y engranaje de ajustes a
+  la derecha; perfil de usuario editable con avatar; gestión de administradores para
+  superadmins; pantalla de Ajustes con apariencia sincronizada con el servidor). Ver plan
+  abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
-- **Pendiente para cerrar Fase 4** (27 jul 2026):
+- **Pendiente para cerrar Fase 4** (29 jul 2026):
   1. Edición de discos (crear/editar obra, edición, temas) cuando el usuario
      autenticado es admin — la API ya soporta ese CRUD (`require_admin`), falta la UI.
      (Distinto de "gestión de administradores", ya hecha — ver abajo: esto es editar el
@@ -166,10 +168,11 @@ admin). Consume `/api/v1/discography/*` de la API (`Release` → `Edition` → `
   Discografía / Tours (esta última un placeholder hasta la Fase 5). Por encima del
   `TabView` vive `AppHeaderBar`, una cabecera **común a toda la app** (no es el
   `navigationBar` de ninguna pestaña, así que no se mueve al navegar dentro de ellas):
-  wordmark "Ommadawn" centrado + `AccountMenu` superpuesto a la derecha. Las vistas raíz
-  de cada pestaña no ponen su propio `navigationTitle` (la pestaña activa ya dice la
-  sección); las vistas de detalle sí, y aparece debajo de la cabecera como si
-  continuara el título de la app.
+  `AccountMenu` (avatar circular) superpuesto a la **izquierda**, wordmark "Ommadawn"
+  centrado, y botón engranaje de ajustes superpuesto a la **derecha** (abre
+  `SettingsView`). Las vistas raíz de cada pestaña no ponen su propio `navigationTitle`
+  (la pestaña activa ya dice la sección); las vistas de detalle sí, y aparece debajo de
+  la cabecera como si continuara el título de la app.
 - Los controles de filtro/orden (con dirección ascendente/descendente) y cambio de
   vista de `ReleaseListView` son un *capsule* flotante cerca del borde inferior
   derecho, no toolbar items.
@@ -180,13 +183,22 @@ módulos.
 
 ---
 
-## Cuenta: menú, perfil y administración (Fase 4)
+## Cuenta: menú, perfil, ajustes y administración (Fase 4)
 
-`AccountMenu` sustituye a la antigua pestaña "Cuenta": es un `Menu` desplegable que
-cuelga del icono de cuenta en `AppHeaderBar` (ver arriba), con el nombre del usuario
-(pulsable, abre el perfil), el selector de apariencia, "Administrar usuarios" (solo si
-`user.is_super_admin`) y cerrar sesión.
+`AccountMenu` cuelga del avatar circular en el lado **izquierdo** de `AppHeaderBar`.
+Contiene solo dos acciones: **"Editar perfil"** (abre `AccountProfileView`) y
+**"Cerrar sesión"** (destructivo). Las opciones de apariencia y administración se
+movieron al engranaje de ajustes (botón derecho de la cabecera → `SettingsView`).
 
+- **`Settings/SettingsView`**: pantalla de ajustes — selector de apariencia
+  (Sistema/Claro/Oscuro, estilo `.inline`, sincronizado con `theme_preference` del
+  servidor vía `PATCH /auth/me`) y, solo si `is_super_admin`, acceso a "Administrar
+  usuarios". La sincronización va en ambas direcciones: al arrancar/hacer login,
+  `AuthSession.applyTheme(from:)` aplica la preferencia guardada en el servidor al
+  `UserDefaults` que lee `@AppStorage("appearance")`.
+- **`Design/AppTheme`**: gana una extensión con `apiValue`
+  (`Components.Schemas.ThemePreference`) e `init(from:)` para convertir entre el enum
+  local y el tipo generado del contrato, sin acoplar la capa de red al enum de UI.
 - **`Account/User+Presentation.swift`**: `displayName` (`full_name` si lo hay, si no
   `username`) y `avatarURL` (`URL?` desde `avatar_url`) como extensiones de `User` —
   presentación, no contrato, mismo criterio que `Release+Presentation.swift`.
@@ -194,18 +206,19 @@ cuelga del icono de cuenta en `AppHeaderBar` (ver arriba), con el nombre del usu
   persona si no hay foto). Se usa tanto en el icono pequeño de `AccountMenu` como en el
   preview grande de `AccountProfileView`.
 - **`Account/AccountProfileView`**: hoja de perfil — avatar (`PhotosPicker` para
-  subir/cambiar, botón para quitar) y datos editables (nombre, país, ciudad, fecha de
-  nacimiento) vía `PATCH /auth/me`. Lee el usuario **en vivo** desde `AuthSession` (no
-  por parámetro) para que el avatar se refresque solo tras subir/quitar una foto; los
-  campos del formulario se siembran **una vez** al aparecer, para no perder lo que la
-  persona esté escribiendo si el avatar cambia mientras tanto.
+  subir/cambiar, botón para quitar) y sección "Datos" con el **`username` no editable**
+  (primera fila, `LabeledContent`) seguido de los campos editables con etiqueta visible
+  (nombre, país, ciudad, fecha de nacimiento) vía `PATCH /auth/me`. Los campos usan
+  `LabeledContent` + `TextField` alineado a la derecha para que la etiqueta sea siempre
+  visible, incluso cuando el campo tiene contenido. Lee el usuario **en vivo** desde
+  `AuthSession` para que el avatar se refresque solo; los campos del formulario se
+  siembran **una vez** al aparecer para no perder lo que la persona esté escribiendo.
   - **Limitación conocida**: un campo se puede rellenar pero no "vaciar" desde aquí (un
-    campo vacío no se envía, por cómo funciona el PATCH parcial de la API). Editarlo
-    para poder borrarlo del todo queda pendiente si hace falta.
-- **`AuthSession`**: gana `updateProfile`, `uploadAvatar` y `deleteAvatar`. Las tres
-  actualizan `state` con el `UserRead` que devuelve la API, así que cualquier vista que
-  lea el usuario desde `AuthSession` (el icono de `AppHeaderBar` incluido) se refresca
-  sola — no hace falta replumbing manual.
+    campo vacío no se envía, por cómo funciona el PATCH parcial de la API).
+- **`AuthSession`**: gana `updateProfile` (con `themePreference`), `uploadAvatar` y
+  `deleteAvatar`. Las tres actualizan `state` con el `UserRead` que devuelve la API.
+  `applyTheme(from:)` (privado) sincroniza `UserDefaults` al restaurar sesión, hacer
+  login y guardar perfil.
 - **`OmmadawnAPI/Sources/OmmadawnAPI/AvatarUpload.swift`**: sube el avatar construyendo
   el *part* multipart **a mano**, no con el case `.file` que genera el plugin. El
   contrato declara el fichero como `contentMediaType: application/octet-stream`, y el
@@ -245,15 +258,18 @@ ommadawn/
 │   ├── Admin/                    # Gestión de administradores (solo superadmin)
 │   │   ├── AdminStore.swift
 │   │   └── AdminUsersView.swift
+│   ├── Settings/                 # Ajustes de la app
+│   │   └── SettingsView.swift    # apariencia (sincronizada con servidor) + admin
 │   ├── Discography/              # Fase 4: catálogo (solo lectura por ahora)
 │   │   ├── DiscographyStore.swift
 │   │   ├── ReleaseListView.swift
 │   │   ├── ReleaseDetailView.swift
 │   │   └── Release+Presentation.swift
 │   ├── Design/
-│   │   ├── BrandMark.swift      # el logo "O" como vista reutilizable
-│   │   └── AppTheme.swift       # AppTheme + AppearancePicker
-│   └── Assets.xcassets/         # AppIcon, BrandGray, AccentColor
+│   │   ├── BrandMark.swift      # el logo "O" en Didot Italic como vista reutilizable
+│   │   ├── AppTheme.swift       # AppTheme + extensión apiValue/init(from:) para sincronizar con API
+│   │   └── AboutView.swift      # pantalla "Acerca de" con logo Rural Code Labs
+│   └── Assets.xcassets/         # AppIcon, BrandGray, AccentColor, RuralCodeLabsLogo
 ├── ommadawnTests/               # Tests unitarios (Swift Testing)
 └── ommadawnUITests/             # Tests de UI (XCUITest)
 ```
@@ -363,7 +379,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, menú de Cuenta ✅, perfil con avatar ✅, gestión de admins ✅; pendiente: edición de discos para admin |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera reestructurada ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅; pendiente: edición de discos para admin |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |

@@ -42,11 +42,12 @@ struct RootTabView: View {
     }
 }
 
-/// Cabecera fija de la app: wordmark centrado, menú de Cuenta superpuesto a
-/// la derecha. No es un `NavigationStack` de ninguna pestaña, así que no se
-/// mueve al navegar dentro de ellas.
+/// Cabecera fija de la app: wordmark centrado, avatar de cuenta a la
+/// izquierda y engranaje de ajustes a la derecha. No es un NavigationStack
+/// de ninguna pestaña, así que no se mueve al navegar dentro de ellas.
 private struct AppHeaderBar: View {
     let user: User
+    @State private var showingSettings = false
 
     var body: some View {
         HStack {
@@ -57,12 +58,27 @@ private struct AppHeaderBar: View {
                 .foregroundStyle(Color("BrandGray"))
             Spacer()
         }
-        .overlay(alignment: .trailing) {
+        .overlay(alignment: .leading) {
             AccountMenu(user: user)
+        }
+        .overlay(alignment: .trailing) {
+            Button {
+                showingSettings = true
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 20))
+                    .foregroundStyle(.primary)
+            }
+            .buttonStyle(.plain)
+            .padding()
+            .accessibilityLabel("Ajustes")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
         .background(.bar)
+        .sheet(isPresented: $showingSettings) {
+            SettingsView(user: user)
+        }
     }
 }
 
@@ -82,6 +98,7 @@ private struct ToursPlaceholderView: View {
         id: 1,
         username: "rafatest",
         email: "rafa@example.com",
+        theme_preference: .system,
         is_active: true,
         is_admin: false,
         is_super_admin: false,

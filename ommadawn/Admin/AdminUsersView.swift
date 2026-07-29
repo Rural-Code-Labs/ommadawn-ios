@@ -143,6 +143,7 @@ struct AdminUsersView: View {
             id: 1,
             username: "discotest2",
             email: "discotest2@example.com",
+            theme_preference: .system,
             is_active: true,
             is_admin: true,
             is_super_admin: true,
