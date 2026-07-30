@@ -14,7 +14,8 @@ import OmmadawnAPI
 /// Motivos por los que una llamada al catálogo puede fallar.
 enum DiscographyError: Error {
     case notFound
-    case forbidden    // 403 — el endpoint exige admin y el usuario no lo es
+    case forbidden     // 403 — el endpoint exige admin y el usuario no lo es
+    case imageTooLarge // 413 — imagen supera el límite del servidor
     case unexpected(Int)
     case network(Error)
 }
@@ -231,6 +232,55 @@ struct DiscographyStore {
         do {
             let output = try await client.delete_edition_api_v1_discography_releases__release_id__editions__edition_id__delete(
                 .init(path: .init(release_id: releaseID, edition_id: editionID))
+            )
+            switch output {
+            case .noContent: return
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    // MARK: - Imágenes (require_admin)
+
+    func uploadEditionImage(
+        releaseID: Int,
+        editionID: Int,
+        data: Data,
+        mimeType: String,
+        filename: String,
+        imageType: ReleaseImageType
+    ) async throws -> ReleaseImage {
+        do {
+            let output = try await client.uploadEditionImage(
+                releaseID: releaseID,
+                editionID: editionID,
+                data: data,
+                mimeType: mimeType,
+                filename: filename,
+                imageType: imageType
+            )
+            switch output {
+            case .created(let r): return try r.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .contentTooLarge: throw DiscographyError.imageTooLarge
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    func deleteEditionImage(releaseID: Int, editionID: Int, imageID: Int) async throws {
+        do {
+            let output = try await client.delete_image_api_v1_discography_releases__release_id__editions__edition_id__images__image_id__delete(
+                .init(path: .init(release_id: releaseID, edition_id: editionID, image_id: imageID))
             )
             switch output {
             case .noContent: return

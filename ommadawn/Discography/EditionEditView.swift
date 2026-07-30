@@ -213,6 +213,7 @@ struct EditionEditView: View {
         switch error {
         case .forbidden:          "No tienes permisos para realizar esta acción."
         case .notFound:           "La edición o el disco ya no existe."
+        case .imageTooLarge:      "La imagen supera el tamaño máximo permitido."
         case .unexpected(let c):  "Error del servidor (\(c))."
         case .network:            "Comprueba tu conexión e inténtalo de nuevo."
         }
