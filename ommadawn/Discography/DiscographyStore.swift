@@ -14,6 +14,7 @@ import OmmadawnAPI
 /// Motivos por los que una llamada al catálogo puede fallar.
 enum DiscographyError: Error {
     case notFound
+    case forbidden    // 403 — el endpoint exige admin y el usuario no lo es
     case unexpected(Int)
     case network(Error)
 }
@@ -50,6 +51,63 @@ struct DiscographyStore {
             throw DiscographyError.network(error)
         }
     }
+
+    // MARK: - Escritura (require_admin)
+
+    /// Crea una obra nueva en el catálogo.
+    func createRelease(title: String, type: ReleaseType) async throws -> Release {
+        do {
+            let output = try await client.create_release_api_v1_discography_releases_post(
+                .init(body: .json(.init(title: title, release_type: type)))
+            )
+            switch output {
+            case .created(let created): return try created.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let code, _): throw DiscographyError.unexpected(code)
+            }
+        } catch let error as DiscographyError { throw error }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Actualiza título y/o tipo de una obra existente.
+    func updateRelease(id: Int, title: String, type: ReleaseType) async throws -> Release {
+        do {
+            let output = try await client.update_release_api_v1_discography_releases__release_id__patch(
+                .init(path: .init(release_id: id), body: .json(.init(title: title, release_type: type)))
+            )
+            switch output {
+            case .ok(let ok): return try ok.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let code, _): throw DiscographyError.unexpected(code)
+            }
+        } catch let error as DiscographyError { throw error }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Elimina una obra y todas sus ediciones.
+    func deleteRelease(id: Int) async throws {
+        do {
+            let output = try await client.delete_release_api_v1_discography_releases__release_id__delete(
+                .init(path: .init(release_id: id))
+            )
+            switch output {
+            case .noContent: return
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let code, _): throw DiscographyError.unexpected(code)
+            }
+        } catch let error as DiscographyError { throw error }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    // MARK: - Lectura
 
     /// Detalle de una obra, con sus ediciones, temas e imágenes.
     func fetchRelease(id: Int) async throws -> Release {

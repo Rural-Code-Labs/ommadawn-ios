@@ -45,8 +45,14 @@ struct ReleaseListView: View {
     /// Compartir la misma tarea evita la carrera y ambos llamadores esperan
     /// el mismo resultado.
     @State private var loadTask: Task<Void, Never>?
+    @State private var showingCreate = false
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
+
+    private var isAdmin: Bool {
+        guard case .signedIn(let user) = session.state else { return false }
+        return user.is_admin
+    }
 
     private var sortedReleases: [Release] {
         let ascending = sortAscending
@@ -74,6 +80,11 @@ struct ReleaseListView: View {
             }
             .task(id: typeFilter) {
                 await load()
+            }
+            .sheet(isPresented: $showingCreate) {
+                ReleaseEditView { newRelease in
+                    releases.append(newRelease)
+                }
             }
     }
 
@@ -137,8 +148,19 @@ struct ReleaseListView: View {
 
     /// Filtro/orden y cambio de vista, flotantes sobre el contenido cerca
     /// del borde inferior derecho, uno encima del otro.
+    /// Si el usuario es admin, añade un botón "+" arriba para crear discos.
     private var floatingControls: some View {
         VStack(spacing: 14) {
+            if isAdmin {
+                Button {
+                    showingCreate = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18))
+                        .frame(width: 24, height: 24)
+                }
+                .accessibilityLabel("Nuevo disco")
+            }
             filterMenu
             viewModeButton
         }

@@ -13,9 +13,13 @@ import OmmadawnAPI
 
 struct ReleaseDetailView: View {
     @Environment(AuthSession.self) private var session
+    @Environment(\.dismiss) private var dismiss
 
     @State private var release: Release
     @State private var selectedEditionID: Int?
+    @State private var showingEdit = false
+    @State private var showingDeleteConfirm = false
+    @State private var isDeleting = false
 
     init(release: Release) {
         _release = State(initialValue: release)
@@ -23,6 +27,11 @@ struct ReleaseDetailView: View {
     }
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
+
+    private var isAdmin: Bool {
+        guard case .signedIn(let user) = session.state else { return false }
+        return user.is_admin
+    }
 
     private var selectedEdition: Edition? {
         release.editions.first { $0.id == selectedEditionID } ?? release.displayEdition
@@ -57,6 +66,44 @@ struct ReleaseDetailView: View {
         .navigationTitle(release.title)
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await refresh() }
+        .toolbar {
+            if isAdmin {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button {
+                            showingEdit = true
+                        } label: {
+                            Label("Editar disco", systemImage: "pencil")
+                        }
+                        Button(role: .destructive) {
+                            showingDeleteConfirm = true
+                        } label: {
+                            Label("Eliminar disco", systemImage: "trash")
+                        }
+                    } label: {
+                        if isDeleting {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingEdit) {
+            ReleaseEditView(release: release) { updated in
+                release = updated
+            }
+        }
+        .confirmationDialog(
+            "¿Eliminar \"\(release.title)\"?",
+            isPresented: $showingDeleteConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Eliminar", role: .destructive) { Task { await deleteRelease() } }
+        } message: {
+            Text("Se eliminarán también todas sus ediciones y temas. Esta acción no se puede deshacer.")
+        }
     }
 
     private var header: some View {
@@ -127,6 +174,13 @@ struct ReleaseDetailView: View {
     private func coverURL(of edition: Edition) -> URL? {
         guard let cover = edition.images.first(where: { $0.image_type == .front_cover }) else { return nil }
         return URL(string: cover.url)
+    }
+
+    private func deleteRelease() async {
+        isDeleting = true
+        defer { isDeleting = false }
+        try? await store.deleteRelease(id: release.id)
+        dismiss()
     }
 
     private func refresh() async {
