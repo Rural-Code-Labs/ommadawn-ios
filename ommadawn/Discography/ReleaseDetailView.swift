@@ -60,7 +60,7 @@ struct ReleaseDetailView: View {
                     .padding(.top, 40)
                 } else {
                     if release.editions.count > 1 {
-                        editionPicker
+                        editionList
                     }
                     if let edition = selectedEdition {
                         editionMeta(edition)
@@ -181,13 +181,24 @@ struct ReleaseDetailView: View {
             .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
-    private var editionPicker: some View {
-        Picker("Edición", selection: $selectedEditionID) {
+    private var editionList: some View {
+        VStack(spacing: 0) {
             ForEach(release.editions, id: \.id) { edition in
-                Text(edition.edition_name ?? edition.country ?? "Edición").tag(Optional(edition.id))
+                EditionRow(
+                    edition: edition,
+                    coverURL: coverURL(of: edition),
+                    isSelected: edition.id == selectedEditionID
+                )
+                .contentShape(Rectangle())
+                .onTapGesture { selectedEditionID = edition.id }
+
+                if edition.id != release.editions.last?.id {
+                    Divider().padding(.leading, 72)
+                }
             }
         }
-        .pickerStyle(.segmented)
+        .background(.background.secondary)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func editionMeta(_ edition: Edition) -> some View {
@@ -253,6 +264,61 @@ struct ReleaseDetailView: View {
         if selectedEditionID == nil || !release.editions.contains(where: { $0.id == selectedEditionID }) {
             selectedEditionID = release.displayEdition?.id
         }
+    }
+}
+
+// MARK: - Fila de edición
+
+private struct EditionRow: View {
+    let edition: Edition
+    let coverURL: URL?
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            // Miniatura de portada
+            AsyncImage(url: coverURL) { image in
+                image.resizable().aspectRatio(contentMode: .fill)
+            } placeholder: {
+                Image(systemName: "opticaldisc")
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.quaternary)
+            }
+            .frame(width: 52, height: 52)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+
+            // Metadatos
+            VStack(alignment: .leading, spacing: 2) {
+                Text(edition.edition_name ?? edition.country ?? "Edición")
+                    .font(.body)
+                    .lineLimit(1)
+
+                let subtitle = [
+                    edition.format?.displayName,
+                    edition.release_date.map { String($0.prefix(4)) },
+                    edition.label
+                ].compactMap { $0 }.joined(separator: " · ")
+
+                if !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(.body.weight(.semibold))
+                    .foregroundColor(.accentColor)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
     }
 }
 
