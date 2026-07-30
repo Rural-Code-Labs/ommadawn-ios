@@ -26,6 +26,19 @@ extension Release {
     }
 }
 
+extension EditionFormat {
+    var displayName: String {
+        switch self {
+        case .vinyl:      "Vinilo"
+        case .cd:         "CD"
+        case .single:     "Single"
+        case .maxi_single:"Maxi Single"
+        case .cd_single:  "CD Single"
+        case .cassette:   "Casete"
+        }
+    }
+}
+
 extension ReleaseType {
     // Ya conforma a CaseIterable en el tipo generado (Types.swift); solo
     // añadimos aquí la presentación en español.
