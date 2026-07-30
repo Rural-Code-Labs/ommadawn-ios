@@ -47,11 +47,22 @@ con otra base de código.
   abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
-- **Pendiente para cerrar Fase 4** (29 jul 2026):
-  1. Edición de discos (crear/editar obra, edición, temas) cuando el usuario
-     autenticado es admin — la API ya soporta ese CRUD (`require_admin`), falta la UI.
-     (Distinto de "gestión de administradores", ya hecha — ver abajo: esto es editar el
-     *catálogo*, no promover usuarios).
+- **Edición de catálogo para admins (Fase 4, hecha en 3 capas, 30 jul 2026)**:
+  1. **Capa 1 — Release CRUD**: `ReleaseEditView` (crear/editar título y tipo), eliminar
+     release con `confirmationDialog`. Menú ⋯ en toolbar del detalle, solo visible a admins.
+  2. **Capa 2 — Edition CRUD + tracklist**: `EditionEditView` (crear/editar edición con
+     metadatos completos y tracklist), eliminar edición. Los temas usan `EditableTrack`
+     (modelo local con `durationText` "M:SS") y se envían como array completo en el PATCH.
+     Nota: `.environment(\.editMode, .constant(.active))` bloquea taps en Buttons — se usan
+     botones ⊖ inline en cada fila en vez de `.onDelete`.
+  3. **Capa 3 — Imágenes de edición**: `EditionImagesView` (hoja: ver miniaturas, subir con
+     `PhotosPicker`, eliminar). `ImageUpload.swift` en `OmmadawnAPI`: multipart a mano con
+     MIME real (mismo patrón que `AvatarUpload`). El caso 413 en el contrato generado se
+     llama `.contentTooLarge`.
+- **Lista de ediciones en detalle (30 jul 2026)**: el `Picker` segmentado se reemplazó por
+  una lista de filas (`EditionRow`) con miniatura de portada, nombre, formato · año · sello
+  y checkmark en la edición seleccionada. Al tocar una fila se actualiza el detalle.
+- **Pendiente para cerrar Fase 4**: cosas a revisar y mejorar (UX, bugs, pulido) a decidir.
 
 ---
 
@@ -379,7 +390,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera reestructurada ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅; pendiente: edición de discos para admin |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera reestructurada ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅; pendiente: revisar y pulir UX |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |
