@@ -97,10 +97,11 @@ struct ReleaseEditView: View {
 
     private func message(for error: DiscographyError) -> String {
         switch error {
-        case .forbidden:       "No tienes permisos para realizar esta acción."
-        case .notFound:        "El disco ya no existe."
+        case .forbidden:            "No tienes permisos para realizar esta acción."
+        case .notFound:             "El disco ya no existe."
+        case .imageTooLarge:        "La imagen supera el tamaño máximo permitido."
         case .unexpected(let code): "Error del servidor (\(code))."
-        case .network:         "Comprueba tu conexión e inténtalo de nuevo."
+        case .network:              "Comprueba tu conexión e inténtalo de nuevo."
         }
     }
 }

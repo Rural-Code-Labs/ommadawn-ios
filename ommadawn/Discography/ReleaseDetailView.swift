@@ -28,6 +28,7 @@ struct ReleaseDetailView: View {
     @State private var showingEditEdition = false
     @State private var showingDeleteEditionConfirm = false
     @State private var isDeletingEdition = false
+    @State private var showingEditionImages = false
 
     init(release: Release) {
         _release = State(initialValue: release)
@@ -96,6 +97,9 @@ struct ReleaseDetailView: View {
                             Button { showingEditEdition = true } label: {
                                 Label("Editar edición", systemImage: "pencil.circle")
                             }
+                            Button { showingEditionImages = true } label: {
+                                Label("Imágenes de la edición", systemImage: "photo.stack")
+                            }
                             Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
                                 Label("Eliminar edición", systemImage: "minus.circle")
                             }
@@ -139,6 +143,11 @@ struct ReleaseDetailView: View {
                         release.editions[idx] = updated
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showingEditionImages, onDismiss: { Task { await refresh() } }) {
+            if let edition = selectedEdition {
+                EditionImagesView(release: release, edition: edition)
             }
         }
         .confirmationDialog(
