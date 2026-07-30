@@ -17,9 +17,17 @@ struct ReleaseDetailView: View {
 
     @State private var release: Release
     @State private var selectedEditionID: Int?
+
+    // Estado del menú de Release
     @State private var showingEdit = false
     @State private var showingDeleteConfirm = false
     @State private var isDeleting = false
+
+    // Estado del menú de Edition
+    @State private var showingCreateEdition = false
+    @State private var showingEditEdition = false
+    @State private var showingDeleteEditionConfirm = false
+    @State private var isDeletingEdition = false
 
     init(release: Release) {
         _release = State(initialValue: release)
@@ -70,18 +78,30 @@ struct ReleaseDetailView: View {
             if isAdmin {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        Button {
-                            showingEdit = true
-                        } label: {
+                        // Acciones del disco
+                        Button { showingEdit = true } label: {
                             Label("Editar disco", systemImage: "pencil")
                         }
-                        Button(role: .destructive) {
-                            showingDeleteConfirm = true
-                        } label: {
+                        Button(role: .destructive) { showingDeleteConfirm = true } label: {
                             Label("Eliminar disco", systemImage: "trash")
                         }
+
+                        Divider()
+
+                        // Acciones de la edición seleccionada
+                        Button { showingCreateEdition = true } label: {
+                            Label("Nueva edición", systemImage: "plus.circle")
+                        }
+                        if selectedEdition != nil {
+                            Button { showingEditEdition = true } label: {
+                                Label("Editar edición", systemImage: "pencil.circle")
+                            }
+                            Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
+                                Label("Eliminar edición", systemImage: "minus.circle")
+                            }
+                        }
                     } label: {
-                        if isDeleting {
+                        if isDeleting || isDeletingEdition {
                             ProgressView()
                         } else {
                             Image(systemName: "ellipsis.circle")
@@ -90,6 +110,7 @@ struct ReleaseDetailView: View {
                 }
             }
         }
+        // Sheets de Release
         .sheet(isPresented: $showingEdit) {
             ReleaseEditView(release: release) { updated in
                 release = updated
@@ -103,6 +124,31 @@ struct ReleaseDetailView: View {
             Button("Eliminar", role: .destructive) { Task { await deleteRelease() } }
         } message: {
             Text("Se eliminarán también todas sus ediciones y temas. Esta acción no se puede deshacer.")
+        }
+        // Sheets de Edition
+        .sheet(isPresented: $showingCreateEdition) {
+            EditionEditView(release: release) { newEdition in
+                release.editions.append(newEdition)
+                selectedEditionID = newEdition.id
+            }
+        }
+        .sheet(isPresented: $showingEditEdition) {
+            if let edition = selectedEdition {
+                EditionEditView(release: release, edition: edition) { updated in
+                    if let idx = release.editions.firstIndex(where: { $0.id == updated.id }) {
+                        release.editions[idx] = updated
+                    }
+                }
+            }
+        }
+        .confirmationDialog(
+            "¿Eliminar edición de \"\(release.title)\"?",
+            isPresented: $showingDeleteEditionConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Eliminar", role: .destructive) { Task { await deleteEdition() } }
+        } message: {
+            Text("Se eliminarán también sus temas e imágenes. Esta acción no se puede deshacer.")
         }
     }
 
@@ -181,6 +227,15 @@ struct ReleaseDetailView: View {
         defer { isDeleting = false }
         try? await store.deleteRelease(id: release.id)
         dismiss()
+    }
+
+    private func deleteEdition() async {
+        guard let edition = selectedEdition else { return }
+        isDeletingEdition = true
+        defer { isDeletingEdition = false }
+        try? await store.deleteEdition(releaseID: release.id, editionID: edition.id)
+        release.editions.removeAll { $0.id == edition.id }
+        selectedEditionID = release.displayEdition?.id
     }
 
     private func refresh() async {

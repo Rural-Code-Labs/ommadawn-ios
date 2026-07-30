@@ -19,6 +19,66 @@ enum DiscographyError: Error {
     case network(Error)
 }
 
+/// DTO intermedio: los datos del formulario de edición, independiente de los
+/// tipos generados. Lo construye `EditionEditView` y lo consume el store.
+struct EditionPayload {
+    var editionName: String = ""
+    var country: String = ""
+    var label: String = ""
+    var catalogNumber: String = ""
+    var releaseDate: String? = nil     // "YYYY-MM-DD" o nil
+    var format: EditionFormat? = nil
+    var credits: String = ""
+    var notes: String = ""
+    var isPrimary: Bool = false
+    var tracks: [EditableTrack] = []
+
+    var trackPayloads: [Components.Schemas.TrackCreate] {
+        tracks.enumerated().compactMap { index, track in
+            let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !title.isEmpty else { return nil }
+            return .init(position: index + 1, title: title, duration_seconds: track.durationSeconds)
+        }
+    }
+}
+
+/// Modelo local de tema para el formulario (sin ID de API: la posición es el índice).
+struct EditableTrack: Identifiable {
+    var id = UUID()
+    var title: String = ""
+    var durationText: String = ""  // "M:SS" o "H:MM:SS" como el usuario lo introduce
+
+    var durationSeconds: Int? {
+        let parts = durationText.split(separator: ":").compactMap { Int($0) }
+        switch parts.count {
+        case 2: return parts[0] * 60 + parts[1]
+        case 3: return parts[0] * 3600 + parts[1] * 60 + parts[2]
+        default: return nil
+        }
+    }
+
+    init(title: String = "", durationText: String = "") {
+        self.title = title
+        self.durationText = durationText
+    }
+
+    init(from track: Track) {
+        self.title = track.title
+        if let secs = track.duration_seconds {
+            let h = secs / 3600
+            let m = (secs % 3600) / 60
+            let s = secs % 60
+            self.durationText = h > 0
+                ? String(format: "%d:%02d:%02d", h, m, s)
+                : String(format: "%d:%02d", m, s)
+        }
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? { trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : trimmingCharacters(in: .whitespacesAndNewlines) }
+}
+
 /// Sin estado propio observable (solo envuelve al `Client`): un `struct` de
 /// funciones, no una clase. A diferencia de `AuthSession`, no hay nada aquí
 /// que una vista necesite observar.
@@ -104,6 +164,83 @@ struct DiscographyStore {
             case .undocumented(let code, _): throw DiscographyError.unexpected(code)
             }
         } catch let error as DiscographyError { throw error }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    // MARK: - Ediciones (require_admin)
+
+    func createEdition(releaseID: Int, data: EditionPayload) async throws -> Edition {
+        do {
+            let body = Components.Schemas.EditionCreate(
+                country: data.country.nilIfEmpty,
+                label: data.label.nilIfEmpty,
+                edition_name: data.editionName.nilIfEmpty,
+                catalog_number: data.catalogNumber.nilIfEmpty,
+                release_date: data.releaseDate,
+                format: data.format,
+                credits: data.credits.nilIfEmpty,
+                notes: data.notes.nilIfEmpty,
+                is_primary: data.isPrimary,
+                tracks: data.trackPayloads
+            )
+            let output = try await client.create_edition_api_v1_discography_releases__release_id__editions_post(
+                .init(path: .init(release_id: releaseID), body: .json(body))
+            )
+            switch output {
+            case .created(let r): return try r.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    func updateEdition(releaseID: Int, editionID: Int, data: EditionPayload) async throws -> Edition {
+        do {
+            let body = Components.Schemas.EditionUpdate(
+                country: data.country.nilIfEmpty,
+                label: data.label.nilIfEmpty,
+                edition_name: data.editionName.nilIfEmpty,
+                catalog_number: data.catalogNumber.nilIfEmpty,
+                release_date: data.releaseDate,
+                format: data.format,
+                credits: data.credits.nilIfEmpty,
+                notes: data.notes.nilIfEmpty,
+                is_primary: data.isPrimary,
+                tracks: data.trackPayloads
+            )
+            let output = try await client.update_edition_api_v1_discography_releases__release_id__editions__edition_id__patch(
+                .init(path: .init(release_id: releaseID, edition_id: editionID), body: .json(body))
+            )
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    func deleteEdition(releaseID: Int, editionID: Int) async throws {
+        do {
+            let output = try await client.delete_edition_api_v1_discography_releases__release_id__editions__edition_id__delete(
+                .init(path: .init(release_id: releaseID, edition_id: editionID))
+            )
+            switch output {
+            case .noContent: return
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
         catch { throw DiscographyError.network(error) }
     }
 
