@@ -46,12 +46,18 @@ struct ReleaseListView: View {
     /// el mismo resultado.
     @State private var loadTask: Task<Void, Never>?
     @State private var showingCreate = false
+    @State private var searchText = ""
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
 
     private var isAdmin: Bool {
         guard case .signedIn(let user) = session.state else { return false }
         return user.is_admin
+    }
+
+    private var filteredReleases: [Release] {
+        guard !searchText.isEmpty else { return sortedReleases }
+        return sortedReleases.filter { $0.title.localizedStandardContains(searchText) }
     }
 
     private var sortedReleases: [Release] {
@@ -73,11 +79,14 @@ struct ReleaseListView: View {
     }
 
     var body: some View {
-        content
-            .toolbar(.hidden, for: .navigationBar)
-            .overlay(alignment: .bottomTrailing) {
-                floatingControls
-            }
+        VStack(spacing: 0) {
+            searchBar
+            content
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .overlay(alignment: .bottomTrailing) {
+            floatingControls
+        }
             .task(id: typeFilter) {
                 await load()
             }
@@ -107,6 +116,8 @@ struct ReleaseListView: View {
                 systemImage: "opticaldisc",
                 description: Text(typeFilter == nil ? "El catálogo está vacío." : "No hay obras de tipo \(typeFilter!.displayName.lowercased()).")
             )
+        } else if filteredReleases.isEmpty {
+            ContentUnavailableView.search(text: searchText)
         } else {
             switch displayMode {
             case .grid: releaseGrid
@@ -118,7 +129,7 @@ struct ReleaseListView: View {
     private var releaseGrid: some View {
         ScrollView {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 16)], spacing: 20) {
-                ForEach(sortedReleases, id: \.id) { release in
+                ForEach(filteredReleases, id: \.id) { release in
                     NavigationLink(value: release) {
                         ReleaseGridCell(release: release)
                     }
@@ -134,7 +145,7 @@ struct ReleaseListView: View {
     }
 
     private var releaseList: some View {
-        List(sortedReleases, id: \.id) { release in
+        List(filteredReleases, id: \.id) { release in
             NavigationLink(value: release) {
                 ReleaseListRow(release: release)
             }
@@ -144,6 +155,29 @@ struct ReleaseListView: View {
         .navigationDestination(for: Release.self) { release in
             ReleaseDetailView(release: release)
         }
+    }
+
+    private var searchBar: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Buscar por título", text: $searchText)
+                .autocorrectionDisabled()
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
     }
 
     /// Filtro/orden y cambio de vista, flotantes sobre el contenido cerca
