@@ -12,19 +12,31 @@ import OpenAPIURLSession
 
 /// Entornos contra los que puede correr la app.
 ///
-/// De momento solo `development` (la API local con `uvicorn`). Cuando exista
-/// un servidor desplegado, se añade `production` con su URL.
-public enum APIEnvironment: Sendable {
+/// `rawValue` String para persistirlo en `UserDefaults`.
+public enum APIEnvironment: String, Sendable, CaseIterable {
     /// API local en el Mac. En el simulador funciona por loopback (127.0.0.1).
-    /// En dispositivo físico habría que usar la IP del Mac en la LAN.
+    /// En dispositivo físico habría que usar la IP del Mac en la LAN o cambiar
+    /// al entorno de pre-producción.
     case development
+
+    /// Servidor de pre-producción desplegado. Requiere conexión a internet.
+    case preproduction
 
     /// Origen del servidor: SOLO esquema + host + puerto.
     /// Las rutas del contrato ya incluyen `/api/v1/...`, por eso no va aquí.
-    var baseURL: URL {
+    public var baseURL: URL {
         switch self {
         case .development:
             URL(string: "http://127.0.0.1:8000")!
+        case .preproduction:
+            URL(string: "https://api.pre.ommadawn.es")!
+        }
+    }
+
+    public var displayName: String {
+        switch self {
+        case .development:   "Local (127.0.0.1:8000)"
+        case .preproduction: "Pre-producción (api.pre.ommadawn.es)"
         }
     }
 }

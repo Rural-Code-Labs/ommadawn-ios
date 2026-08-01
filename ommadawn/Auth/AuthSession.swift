@@ -56,27 +56,47 @@ final class AuthSession {
 
     private(set) var state: State = .loading
 
-    private let environment: APIEnvironment
+    // El entorno puede cambiar en debug (selector en Ajustes).
+    // Se persiste en UserDefaults para sobrevivir relanzamientos.
+    private(set) var environment: APIEnvironment
     private let tokenStore: TokenStore
-    private let refresher: TokenRefresher
+    private var refresher: TokenRefresher
+    private(set) var client: Client
 
-    /// El único cliente HTTP de la app (con `AuthMiddleware` ya cableado).
-    /// Se expone para que otras features (p. ej. discografía) lo reutilicen
-    /// en vez de crear un `Client` aparte, aunque sus endpoints sean públicos.
-    let client: Client
+    static let environmentKey = "api_environment"
 
-    /// - Parameter tokenStore: inyectable para pruebas; por defecto el común.
+    /// - Parameter environment: si se omite, lee el último entorno guardado
+    ///   (o `.development` si no hay ninguno). Pásalo explícitamente en tests/
+    ///   previews para no depender de `UserDefaults`.
     init(
-        environment: APIEnvironment = .development,
+        environment: APIEnvironment? = nil,
         tokenStore: TokenStore = .shared,
         initialState: State = .loading
     ) {
-        let refresher = TokenRefresher(tokenStore: tokenStore, environment: environment)
-        self.environment = environment
+        let env: APIEnvironment
+        if let environment {
+            env = environment
+        } else {
+            let raw = UserDefaults.standard.string(forKey: Self.environmentKey)
+            env = raw.flatMap(APIEnvironment.init(rawValue:)) ?? .development
+        }
+        let refresher = TokenRefresher(tokenStore: tokenStore, environment: env)
+        self.environment = env
         self.tokenStore = tokenStore
         self.refresher = refresher
-        self.client = Client.authenticated(environment: environment, refresher: refresher)
+        self.client = Client.authenticated(environment: env, refresher: refresher)
         self.state = initialState
+    }
+
+    /// Cambia el entorno de la API, cierra la sesión actual y recrea el cliente.
+    /// Solo debe llamarse desde la pantalla de Ajustes (entorno de debug).
+    func switchEnvironment(_ newEnvironment: APIEnvironment) async {
+        UserDefaults.standard.set(newEnvironment.rawValue, forKey: Self.environmentKey)
+        await logOut()
+        environment = newEnvironment
+        let newRefresher = TokenRefresher(tokenStore: tokenStore, environment: newEnvironment)
+        refresher = newRefresher
+        client = Client.authenticated(environment: newEnvironment, refresher: newRefresher)
     }
 
     /// Al arrancar la app: si hay tokens guardados, valida la sesión pidiendo
