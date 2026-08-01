@@ -47,6 +47,7 @@ struct ReleaseListView: View {
     @State private var loadTask: Task<Void, Never>?
     @State private var showingCreate = false
     @State private var searchText = ""
+    @State private var isSearching = false
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
 
@@ -80,9 +81,13 @@ struct ReleaseListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            searchBar
+            if isSearching {
+                searchBar
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
             content
         }
+        .animation(.snappy, value: isSearching)
         .toolbar(.hidden, for: .navigationBar)
         .overlay(alignment: .bottomTrailing) {
             floatingControls
@@ -195,6 +200,19 @@ struct ReleaseListView: View {
                 }
                 .accessibilityLabel("Nuevo disco")
             }
+            Button {
+                if isSearching {
+                    isSearching = false
+                    searchText = ""
+                } else {
+                    isSearching = true
+                }
+            } label: {
+                Image(systemName: isSearching ? "magnifyingglass.circle.fill" : "magnifyingglass")
+                    .font(.system(size: 18))
+                    .frame(width: 24, height: 24)
+            }
+            .accessibilityLabel(isSearching ? "Cerrar búsqueda" : "Buscar")
             filterMenu
             viewModeButton
         }
