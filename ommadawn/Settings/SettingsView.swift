@@ -47,7 +47,6 @@ struct SettingsView: View {
                     }
                 }
 
-                #if DEBUG
                 Section {
                     Picker("API", selection: Binding(
                         get: { session.environment },
@@ -60,11 +59,10 @@ struct SettingsView: View {
                     .pickerStyle(.inline)
                     .labelsHidden()
                 } header: {
-                    Text("Entorno (solo debug)")
+                    Text("Entorno")
                 } footer: {
                     Text("Cambiar el entorno cierra la sesión actual.")
                 }
-                #endif
             }
             .navigationTitle("Ajustes")
             .navigationBarTitleDisplayMode(.inline)

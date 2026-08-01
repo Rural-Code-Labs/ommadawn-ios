@@ -39,9 +39,7 @@ struct LoginView: View {
     @State private var showingGoogleComingSoon = false
     /// Controla la presentación del panel "Acerca de".
     @State private var showingAbout = false
-    #if DEBUG
     @State private var showingEnvironmentPicker = false
-    #endif
 
     /// Solo evita enviar formularios vacíos. La validación de verdad
     /// (credenciales correctas) la hace el servidor.
@@ -73,9 +71,7 @@ struct LoginView: View {
 
                 registerLink
 
-                #if DEBUG
                 environmentBadge
-                #endif
             }
             .padding(.horizontal, 24)
             .padding(.top, 48)
@@ -290,7 +286,6 @@ struct LoginView: View {
         }
     }
 
-    #if DEBUG
     private var environmentBadge: some View {
         Button {
             showingEnvironmentPicker = true
@@ -303,7 +298,7 @@ struct LoginView: View {
                 .background(.quaternary, in: Capsule())
         }
         .buttonStyle(.plain)
-        .confirmationDialog("Cambiar entorno (debug)", isPresented: $showingEnvironmentPicker) {
+        .confirmationDialog("Cambiar entorno", isPresented: $showingEnvironmentPicker) {
             ForEach(APIEnvironment.allCases, id: \.self) { env in
                 if env != session.environment {
                     Button(env.displayName) {
@@ -315,7 +310,6 @@ struct LoginView: View {
             Text("Servidor activo: \(session.environment.displayName)")
         }
     }
-    #endif
 
     // MARK: - Acciones
 
