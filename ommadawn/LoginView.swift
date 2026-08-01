@@ -277,7 +277,7 @@ struct LoginView: View {
         HStack(spacing: 4) {
             Text("¿No tienes cuenta?")
                 .foregroundStyle(.secondary)
-            Button("Crear una") {
+            Button("Crear cuenta") {
                 showingRegister = true
             }
         }
