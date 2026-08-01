@@ -62,7 +62,15 @@ con otra base de código.
 - **Lista de ediciones en detalle (30 jul 2026)**: el `Picker` segmentado se reemplazó por
   una lista de filas (`EditionRow`) con miniatura de portada, nombre, formato · año · sello
   y checkmark en la edición seleccionada. Al tocar una fila se actualiza el detalle.
-- **Pendiente para cerrar Fase 4**: cosas a revisar y mejorar (UX, bugs, pulido) a decidir.
+- **Selector de entorno de API (1 ago 2026, solo `#if DEBUG`)**: `APIEnvironment` tiene
+  dos casos (`development` → `http://127.0.0.1:8000`, `preproduction` →
+  `https://api.pre.ommadawn.es`), persiste en `UserDefaults` y tiene `displayName`.
+  `AuthSession.switchEnvironment(_:)` persiste el nuevo entorno, cierra sesión y recrea
+  `refresher` y `client`. El selector aparece en `SettingsView` (sección "Entorno",
+  Picker inline con confirmación de alerta) y en `LoginView` (badge de antena al pie del
+  formulario con `confirmationDialog`, para poder cambiar antes de autenticarse). En
+  builds de Release no aparece nada.
+- **Pendiente para cerrar Fase 4**: revisar y pulir UX (bugs, detalles de diseño) a decidir con el usuario.
 
 ---
 
@@ -271,10 +279,13 @@ ommadawn/
 │   │   └── AdminUsersView.swift
 │   ├── Settings/                 # Ajustes de la app
 │   │   └── SettingsView.swift    # apariencia (sincronizada con servidor) + admin
-│   ├── Discography/              # Fase 4: catálogo (solo lectura por ahora)
+│   ├── Discography/              # Fase 4: catálogo + edición para admins
 │   │   ├── DiscographyStore.swift
 │   │   ├── ReleaseListView.swift
 │   │   ├── ReleaseDetailView.swift
+│   │   ├── ReleaseEditView.swift        # crear/editar/eliminar disco (solo admins)
+│   │   ├── EditionEditView.swift        # crear/editar/eliminar edición + tracklist
+│   │   ├── EditionImagesView.swift      # gestión de imágenes de edición
 │   │   └── Release+Presentation.swift
 │   ├── Design/
 │   │   ├── BrandMark.swift      # el logo "O" en Didot Italic como vista reutilizable
@@ -390,7 +401,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera reestructurada ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅; pendiente: revisar y pulir UX |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅; pendiente: revisar y pulir UX |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |

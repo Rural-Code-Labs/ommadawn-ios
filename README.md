@@ -25,10 +25,11 @@ para esta app. Android queda para el futuro con otra base de código.
   automática (reactiva ante `401` y proactiva con `expires_in`) y logout.
 - ✅ **Identidad visual**: logo, wordmark e icono propios.
 - 🚧 **Fase 4 — Discografía**: listado (grid/lista, filtro, orden) y detalle con
-  tracklist, **solo lectura**; cabecera con avatar a la izquierda y engranaje de ajustes
-  a la derecha; perfil de usuario editable con avatar; ajustes de apariencia sincronizados
-  con el servidor; gestión de administradores para superadmins; pantalla "Acerca de".
-  Pendiente: edición de discos para administradores.
+  tracklist; cabecera con avatar a la izquierda y engranaje de ajustes a la derecha;
+  perfil de usuario editable con avatar; ajustes de apariencia sincronizados con el
+  servidor; gestión de administradores para superadmins; pantalla "Acerca de"; edición
+  completa del catálogo para admins (disco, edición, tracklist e imágenes).
+  Pendiente: revisar y pulir UX.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -71,6 +72,7 @@ ommadawn/
 │       ├── TokenRefresher.swift       # renovación coordinada (single-flight)
 │       ├── AuthMiddleware.swift       # Bearer + (401 → refresh → reintento)
 │       ├── AvatarUpload.swift         # sube el avatar con el Content-Type real
+│       ├── ImageUpload.swift          # sube imágenes de edición (mismo patrón)
 │       ├── DateTranscoding.swift      # fechas ISO8601 con microsegundos
 │       └── Models.swift               # alias de conveniencia (User)
 │
@@ -93,10 +95,13 @@ ommadawn/
 │   │   └── AdminUsersView.swift
 │   ├── Settings/                      # ajustes de la app
 │   │   └── SettingsView.swift         # apariencia sincronizada con servidor + admin
-│   ├── Discography/                   # Fase 4: catálogo (solo lectura)
+│   ├── Discography/                   # Fase 4: catálogo + edición para admins
 │   │   ├── DiscographyStore.swift
 │   │   ├── ReleaseListView.swift
 │   │   ├── ReleaseDetailView.swift
+│   │   ├── ReleaseEditView.swift       # crear/editar/eliminar disco (solo admins)
+│   │   ├── EditionEditView.swift       # crear/editar/eliminar edición + tracklist
+│   │   ├── EditionImagesView.swift     # gestión de imágenes de edición
 │   │   └── Release+Presentation.swift
 │   ├── Design/
 │   │   ├── BrandMark.swift            # el logo "O" en Didot Italic como vista reutilizable
@@ -291,7 +296,7 @@ API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha (lectura ✅, cabecera ✅, AccountMenu simplificado ✅, Settings con apariencia sincronizada ✅, perfil ✅, gestión de admins ✅, About ✅; pendiente: edición de discos para admin) |
+| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha — lectura ✅, cabecera ✅, perfil ✅, ajustes ✅, admins ✅, edición completa del catálogo ✅; pendiente: pulir UX |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar. | Pendiente |
