@@ -84,6 +84,16 @@ Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 | 4 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. Necesita un endpoint de sellos en la API. | 🔴 API: endpoint `/labels` (listado + creación) |
 | 5 | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios; un admin los aprueba/rechaza. Necesita modelo de contribuciones en la API y pantalla de revisión en la app. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
 
+### Backlog de mejoras de autenticación
+
+| # | Mejora | Requiere API |
+|---|---|---|
+| A1 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
+| A2 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — el usuario pide el enlace, recibe un correo con un token de un solo uso y establece una nueva contraseña. | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email en el servidor |
+| A3 | **Verificación de correo**: al registrarse, el usuario recibe un email de confirmación; la cuenta queda pendiente hasta que verifica. | 🔴 API: campo `email_verified` en el usuario, `POST /auth/verify-email/request` + `POST /auth/verify-email/confirm`; requiere servicio de email |
+
+> A2 y A3 comparten infraestructura de email en la API (proveedor SMTP o servicio transaccional). Tiene sentido implementarlas juntas en el lado del servidor.
+
 ---
 
 ## Relación con la API hermana
