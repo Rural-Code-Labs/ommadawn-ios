@@ -15,6 +15,7 @@
 //
 
 import SwiftUI
+import OmmadawnAPI
 
 struct LoginView: View {
     @Environment(AuthSession.self) private var session
@@ -38,6 +39,9 @@ struct LoginView: View {
     @State private var showingGoogleComingSoon = false
     /// Controla la presentación del panel "Acerca de".
     @State private var showingAbout = false
+    #if DEBUG
+    @State private var showingEnvironmentPicker = false
+    #endif
 
     /// Solo evita enviar formularios vacíos. La validación de verdad
     /// (credenciales correctas) la hace el servidor.
@@ -68,6 +72,10 @@ struct LoginView: View {
                 googleSignInButton
 
                 registerLink
+
+                #if DEBUG
+                environmentBadge
+                #endif
             }
             .padding(.horizontal, 24)
             .padding(.top, 48)
@@ -281,6 +289,33 @@ struct LoginView: View {
                 .environment(session)
         }
     }
+
+    #if DEBUG
+    private var environmentBadge: some View {
+        Button {
+            showingEnvironmentPicker = true
+        } label: {
+            Label(session.environment.displayName, systemImage: "antenna.radiowaves.left.and.right")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(.quaternary, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .confirmationDialog("Cambiar entorno (debug)", isPresented: $showingEnvironmentPicker) {
+            ForEach(APIEnvironment.allCases, id: \.self) { env in
+                if env != session.environment {
+                    Button(env.displayName) {
+                        Task { await session.switchEnvironment(env) }
+                    }
+                }
+            }
+        } message: {
+            Text("Servidor activo: \(session.environment.displayName)")
+        }
+    }
+    #endif
 
     // MARK: - Acciones
 
