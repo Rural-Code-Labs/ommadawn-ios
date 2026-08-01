@@ -83,6 +83,7 @@ Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 | 3 | **Países con bandera**: lista fija ISO 3166 + emoji de bandera en el picker de país (perfil de usuario y campo país de edición). Se puede resolver con un mapa local, sin tocar la API. | 🟢 Solo app |
 | 4 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. Necesita un endpoint de sellos en la API. | 🔴 API: endpoint `/labels` (listado + creación) |
 | 5 | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios; un admin los aprueba/rechaza. Necesita modelo de contribuciones en la API y pantalla de revisión en la app. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
+| 6 | **Colección personal**: cada usuario puede marcar qué ediciones tiene en su colección con el estado del disco y la funda (p. ej. Mint / Near Mint / Very Good+ / Very Good / Good / Fair / Poor — escala Discogs). Implica una vista de colección propia y un botón en el detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas opcionales), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
 
 ### Backlog de mejoras de autenticación
 
