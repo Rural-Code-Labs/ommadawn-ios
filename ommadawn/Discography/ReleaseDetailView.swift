@@ -11,6 +11,12 @@
 import SwiftUI
 import OmmadawnAPI
 
+private extension Set {
+    mutating func toggle(_ member: Element) {
+        if contains(member) { remove(member) } else { insert(member) }
+    }
+}
+
 struct ReleaseDetailView: View {
     @Environment(AuthSession.self) private var session
     @Environment(\.dismiss) private var dismiss
@@ -402,34 +408,193 @@ private struct EditionListSheet: View {
     @Binding var selectedEditionID: Int?
     @Environment(\.dismiss) private var dismiss
 
+    @State private var showingFilters = false
+    @State private var selectedFormats: Set<String> = []
+    @State private var selectedYears: Set<String> = []
+    @State private var selectedLabels: Set<String> = []
+
     private func coverURL(of edition: Edition) -> URL? {
         guard let cover = edition.images.first(where: { $0.image_type == .front_cover }) else { return nil }
         return URL(string: cover.url)
     }
 
+    private var availableFormats: [String] {
+        Array(Set(release.editions.compactMap { $0.format?.displayName })).sorted()
+    }
+
+    private var availableYears: [String] {
+        Array(Set(release.editions.compactMap {
+            $0.release_date.map { String($0.prefix(4)) }
+        })).sorted()
+    }
+
+    private var availableLabels: [String] {
+        Array(Set(release.editions.compactMap { $0.label })).sorted()
+    }
+
+    private var activeFilterCount: Int {
+        (selectedFormats.isEmpty ? 0 : 1) +
+        (selectedYears.isEmpty ? 0 : 1) +
+        (selectedLabels.isEmpty ? 0 : 1)
+    }
+
+    private var filteredEditions: [Edition] {
+        release.editions.filter { edition in
+            let formatOK = selectedFormats.isEmpty ||
+                edition.format.map { selectedFormats.contains($0.displayName) } == true
+            let yearOK = selectedYears.isEmpty ||
+                edition.release_date.map { selectedYears.contains(String($0.prefix(4))) } == true
+            let labelOK = selectedLabels.isEmpty ||
+                edition.label.map { selectedLabels.contains($0) } == true
+            return formatOK && yearOK && labelOK
+        }
+    }
+
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(release.editions, id: \.id) { edition in
-                    EditionRow(
-                        edition: edition,
-                        coverURL: coverURL(of: edition),
-                        isSelected: edition.id == selectedEditionID
+            Group {
+                if filteredEditions.isEmpty {
+                    ContentUnavailableView(
+                        "Sin resultados",
+                        systemImage: "magnifyingglass",
+                        description: Text("Ninguna edición coincide con los filtros activos.")
                     )
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        selectedEditionID = edition.id
-                        dismiss()
+                } else {
+                    List {
+                        ForEach(filteredEditions, id: \.id) { edition in
+                            EditionRow(
+                                edition: edition,
+                                coverURL: coverURL(of: edition),
+                                isSelected: edition.id == selectedEditionID
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                selectedEditionID = edition.id
+                                dismiss()
+                            }
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                        }
                     }
-                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    .listStyle(.plain)
                 }
             }
-            .listStyle(.plain)
             .navigationTitle("Ediciones")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cerrar") { dismiss() }
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button { showingFilters = true } label: {
+                        Image(systemName: activeFilterCount > 0
+                              ? "line.3.horizontal.decrease.circle.fill"
+                              : "line.3.horizontal.decrease.circle")
+                    }
+                }
+            }
+            .sheet(isPresented: $showingFilters) {
+                EditionFilterSheet(
+                    availableFormats: availableFormats,
+                    availableYears: availableYears,
+                    availableLabels: availableLabels,
+                    selectedFormats: $selectedFormats,
+                    selectedYears: $selectedYears,
+                    selectedLabels: $selectedLabels
+                )
+            }
+        }
+    }
+}
+
+// MARK: - Hoja de filtros
+
+private struct EditionFilterSheet: View {
+    let availableFormats: [String]
+    let availableYears: [String]
+    let availableLabels: [String]
+    @Binding var selectedFormats: Set<String>
+    @Binding var selectedYears: Set<String>
+    @Binding var selectedLabels: Set<String>
+    @Environment(\.dismiss) private var dismiss
+
+    private var hasActiveFilters: Bool {
+        !selectedFormats.isEmpty || !selectedYears.isEmpty || !selectedLabels.isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if availableFormats.count > 1 {
+                    Section("Tipo") {
+                        ForEach(availableFormats, id: \.self) { format in
+                            FilterRow(
+                                title: format,
+                                isSelected: selectedFormats.contains(format)
+                            ) {
+                                selectedFormats.toggle(format)
+                            }
+                        }
+                    }
+                }
+                if availableYears.count > 1 {
+                    Section("Año") {
+                        ForEach(availableYears, id: \.self) { year in
+                            FilterRow(
+                                title: year,
+                                isSelected: selectedYears.contains(year)
+                            ) {
+                                selectedYears.toggle(year)
+                            }
+                        }
+                    }
+                }
+                if availableLabels.count > 1 {
+                    Section("Sello") {
+                        ForEach(availableLabels, id: \.self) { label in
+                            FilterRow(
+                                title: label,
+                                isSelected: selectedLabels.contains(label)
+                            ) {
+                                selectedLabels.toggle(label)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Filtros")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Restablecer") {
+                        selectedFormats = []
+                        selectedYears = []
+                        selectedLabels = []
+                    }
+                    .disabled(!hasActiveFilters)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Listo") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+private struct FilterRow: View {
+    let title: String
+    let isSelected: Bool
+    let toggle: () -> Void
+
+    var body: some View {
+        Button(action: toggle) {
+            HStack {
+                Text(title)
+                    .foregroundStyle(.primary)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(.tint)
+                        .fontWeight(.semibold)
                 }
             }
         }
