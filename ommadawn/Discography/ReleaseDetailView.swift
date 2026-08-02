@@ -170,7 +170,7 @@ struct ReleaseDetailView: View {
             .overlay {
                 if let url = selectedEdition.flatMap(coverURL) ?? release.coverURL {
                     AsyncImage(url: url) { image in
-                        image.resizable().aspectRatio(contentMode: .fill)
+                        image.resizable().aspectRatio(contentMode: .fit)
                     } placeholder: {
                         Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.secondary)
                     }
@@ -278,7 +278,7 @@ private struct EditionRow: View {
         HStack(spacing: 12) {
             // Miniatura de portada
             AsyncImage(url: coverURL) { image in
-                image.resizable().aspectRatio(contentMode: .fill)
+                image.resizable().aspectRatio(contentMode: .fit)
             } placeholder: {
                 Image(systemName: "opticaldisc")
                     .font(.title3)
