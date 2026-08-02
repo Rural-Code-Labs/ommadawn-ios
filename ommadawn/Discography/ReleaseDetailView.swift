@@ -53,8 +53,20 @@ struct ReleaseDetailView: View {
         selectedEdition?.images ?? []
     }
 
+    private var sortedEditionImages: [ReleaseImage] {
+        editionImages.sorted { imageTypeOrder($0) < imageTypeOrder($1) }
+    }
+
     private var editionImageURLs: [URL] {
-        editionImages.compactMap { URL(string: $0.url) }
+        sortedEditionImages.compactMap { URL(string: $0.url) }
+    }
+
+    private func imageTypeOrder(_ img: ReleaseImage) -> Int {
+        switch img.image_type {
+        case .front_cover: return 0
+        case .back_cover: return 1
+        case .other: return 2
+        }
     }
 
     var body: some View {
@@ -62,7 +74,7 @@ struct ReleaseDetailView: View {
             VStack(alignment: .leading, spacing: 0) {
                 header
 
-                if !editionImages.isEmpty {
+                if !sortedEditionImages.isEmpty {
                     galleryStrip
                 }
 
@@ -176,8 +188,8 @@ struct ReleaseDetailView: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        guard !editionImages.isEmpty else { return }
-                        viewerStartIndex = editionImages.firstIndex(where: { $0.image_type == .front_cover }) ?? 0
+                        guard !sortedEditionImages.isEmpty else { return }
+                        viewerStartIndex = sortedEditionImages.firstIndex(where: { $0.image_type == .front_cover }) ?? 0
                         showingImageViewer = true
                     }
                 } else {
@@ -243,15 +255,15 @@ struct ReleaseDetailView: View {
 
     private var galleryStrip: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(Array(editionImages.enumerated()), id: \.offset) { index, img in
+            HStack(spacing: 0) {
+                ForEach(Array(sortedEditionImages.enumerated()), id: \.offset) { index, img in
                     AsyncImage(url: URL(string: img.url)) { image in
-                        image.resizable().aspectRatio(contentMode: .fit)
+                        image.resizable().aspectRatio(contentMode: .fill)
                     } placeholder: {
                         Rectangle().fill(.quaternary)
                     }
-                    .frame(width: 72, height: 72)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .frame(width: 80, height: 80)
+                    .clipped()
                     .contentShape(Rectangle())
                     .onTapGesture {
                         viewerStartIndex = index
@@ -259,8 +271,6 @@ struct ReleaseDetailView: View {
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
         }
     }
 

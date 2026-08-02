@@ -2,9 +2,9 @@
 //  ImageViewerView.swift
 //  ommadawn
 //
-//  Visor de imágenes a pantalla completa. Soporta zoom por pellizco y
-//  doble toque, desplazamiento al hacer zoom y deslizamiento horizontal
-//  entre imágenes. El botón de compartir usa el ShareLink del sistema.
+//  Visor de imágenes a pantalla completa. Desliza entre imágenes con el
+//  scroll paginado (desactivado al hacer zoom). Zoom por pellizco y doble
+//  toque. El botón de compartir usa el ShareLink del sistema.
 //
 
 import SwiftUI
@@ -14,17 +14,28 @@ struct ImageViewerView: View {
     @State var selectedIndex: Int
     @Environment(\.dismiss) private var dismiss
 
+    @State private var isZoomed = false
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            TabView(selection: $selectedIndex) {
-                ForEach(Array(images.enumerated()), id: \.offset) { index, url in
-                    ZoomableAsyncImage(url: url)
-                        .tag(index)
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(spacing: 0) {
+                    ForEach(Array(images.enumerated()), id: \.offset) { index, url in
+                        ZoomableAsyncImage(url: url, isZoomed: $isZoomed)
+                            .containerRelativeFrame([.horizontal, .vertical])
+                            .id(index)
+                    }
                 }
+                .scrollTargetLayout()
             }
-            .tabViewStyle(.page(indexDisplayMode: images.count > 1 ? .automatic : .never))
+            .scrollTargetBehavior(.paging)
+            .scrollPosition(id: Binding<Int?>(
+                get: { selectedIndex },
+                set: { selectedIndex = $0 ?? selectedIndex }
+            ))
+            .scrollDisabled(isZoomed)
             .ignoresSafeArea()
         }
         .overlay(alignment: .topLeading) {
@@ -51,6 +62,18 @@ struct ImageViewerView: View {
                 .padding(.top, 12)
             }
         }
+        .overlay(alignment: .bottom) {
+            if images.count > 1 {
+                HStack(spacing: 6) {
+                    ForEach(0..<images.count, id: \.self) { i in
+                        Circle()
+                            .fill(i == selectedIndex ? Color.white : Color.white.opacity(0.4))
+                            .frame(width: 6, height: 6)
+                    }
+                }
+                .padding(.bottom, 20)
+            }
+        }
         .statusBarHidden()
     }
 }
@@ -59,6 +82,7 @@ struct ImageViewerView: View {
 
 private struct ZoomableAsyncImage: View {
     let url: URL
+    @Binding var isZoomed: Bool
 
     @State private var scale: CGFloat = 1
     @State private var offset: CGSize = .zero
@@ -78,14 +102,13 @@ private struct ZoomableAsyncImage: View {
                         y: offset.height + gestureOffset.height
                     )
                     .gesture(pinchGesture)
-                    .simultaneousGesture(panGesture)
+                    .simultaneousGesture(panGesture, including: isZoomed ? .all : .none)
                     .onTapGesture(count: 2) {
                         withAnimation(.spring(duration: 0.3)) {
                             if scale > 1 {
-                                scale = 1
-                                offset = .zero
+                                scale = 1; offset = .zero; isZoomed = false
                             } else {
-                                scale = 2.5
+                                scale = 2.5; isZoomed = true
                             }
                         }
                     }
@@ -94,11 +117,9 @@ private struct ZoomableAsyncImage: View {
             case .failure:
                 VStack(spacing: 8) {
                     Image(systemName: "photo.badge.exclamationmark")
-                        .font(.largeTitle)
-                        .foregroundStyle(.white.opacity(0.5))
+                        .font(.largeTitle).foregroundStyle(.white.opacity(0.5))
                     Text("No se pudo cargar la imagen")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.4))
+                        .font(.caption).foregroundStyle(.white.opacity(0.4))
                 }
             @unknown default:
                 EmptyView()
@@ -118,17 +139,16 @@ private struct ZoomableAsyncImage: View {
                     scale = newScale
                     if newScale <= 1 { offset = .zero }
                 }
+                isZoomed = newScale > 1
             }
     }
 
     private var panGesture: some Gesture {
         DragGesture()
             .updating($gestureOffset) { value, state, _ in
-                guard scale > 1 else { return }
                 state = value.translation
             }
             .onEnded { value in
-                guard scale > 1 else { return }
                 offset.width += value.translation.width
                 offset.height += value.translation.height
             }
