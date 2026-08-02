@@ -189,7 +189,7 @@ struct ReleaseDetailView: View {
                                 .font(.system(size: 13, weight: .semibold))
                                 .monospacedDigit()
                         }
-                        .foregroundStyle(.white)
+                        .foregroundStyle(.tint)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
                         .background(.regularMaterial, in: Capsule())
