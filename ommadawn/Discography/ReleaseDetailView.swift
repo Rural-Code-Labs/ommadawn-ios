@@ -30,8 +30,7 @@ struct ReleaseDetailView: View {
     @State private var isDeletingEdition = false
     @State private var showingEditionImages = false
     @State private var showingEditionList = false
-    @State private var showingImageViewer = false
-    @State private var viewerStartIndex = 0
+    @State private var imageViewerItem: ImageViewerItem?
 
     init(release: Release) {
         _release = State(initialValue: release)
@@ -118,8 +117,8 @@ struct ReleaseDetailView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await refresh() }
-        .fullScreenCover(isPresented: $showingImageViewer) {
-            ImageViewerView(images: editionImageURLs, selectedIndex: viewerStartIndex)
+        .fullScreenCover(item: $imageViewerItem) { item in
+            ImageViewerView(images: item.images, selectedIndex: item.startIndex)
         }
         .sheet(isPresented: $showingEditionList) {
             EditionListSheet(
@@ -188,9 +187,9 @@ struct ReleaseDetailView: View {
                     }
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        guard !sortedEditionImages.isEmpty else { return }
-                        viewerStartIndex = sortedEditionImages.firstIndex(where: { $0.image_type == .front_cover }) ?? 0
-                        showingImageViewer = true
+                        guard !editionImageURLs.isEmpty else { return }
+                        let start = sortedEditionImages.firstIndex(where: { $0.image_type == .front_cover }) ?? 0
+                        imageViewerItem = ImageViewerItem(images: editionImageURLs, startIndex: start)
                     }
                 } else {
                     Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.secondary)
@@ -266,8 +265,7 @@ struct ReleaseDetailView: View {
                     .clipped()
                     .contentShape(Rectangle())
                     .onTapGesture {
-                        viewerStartIndex = index
-                        showingImageViewer = true
+                        imageViewerItem = ImageViewerItem(images: editionImageURLs, startIndex: index)
                     }
                 }
             }
@@ -434,6 +432,14 @@ private struct EditionListSheet: View {
             }
         }
     }
+}
+
+// MARK: - Modelo para el visor de imágenes
+
+private struct ImageViewerItem: Identifiable {
+    let id = UUID()
+    let images: [URL]
+    let startIndex: Int
 }
 
 #Preview {

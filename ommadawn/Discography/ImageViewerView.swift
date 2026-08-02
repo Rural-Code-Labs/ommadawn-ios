@@ -11,31 +11,47 @@ import SwiftUI
 
 struct ImageViewerView: View {
     let images: [URL]
-    @State var selectedIndex: Int
+    let initialIndex: Int
+
+    @State private var currentPage: Int
+    @State private var isZoomed = false
     @Environment(\.dismiss) private var dismiss
 
-    @State private var isZoomed = false
+    init(images: [URL], selectedIndex: Int) {
+        self.images = images
+        self.initialIndex = selectedIndex
+        self._currentPage = State(initialValue: selectedIndex)
+    }
 
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                LazyHStack(spacing: 0) {
-                    ForEach(Array(images.enumerated()), id: \.offset) { index, url in
-                        ZoomableAsyncImage(url: url, isZoomed: $isZoomed)
-                            .containerRelativeFrame([.horizontal, .vertical])
-                            .id(index)
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 0) {
+                        ForEach(Array(images.enumerated()), id: \.offset) { index, url in
+                            ZoomableAsyncImage(url: url, isZoomed: $isZoomed)
+                                .containerRelativeFrame([.horizontal, .vertical])
+                                .id(index)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: Binding<Int?>(
+                    get: { currentPage },
+                    set: { currentPage = $0 ?? currentPage }
+                ))
+                .scrollDisabled(isZoomed)
+                .onAppear {
+                    // Diferimos un ciclo para que el layout esté completo
+                    // antes de forzar el scroll a la posición inicial.
+                    DispatchQueue.main.async {
+                        proxy.scrollTo(initialIndex, anchor: .leading)
                     }
                 }
-                .scrollTargetLayout()
             }
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: Binding<Int?>(
-                get: { selectedIndex },
-                set: { selectedIndex = $0 ?? selectedIndex }
-            ))
-            .scrollDisabled(isZoomed)
             .ignoresSafeArea()
         }
         .overlay(alignment: .topLeading) {
@@ -50,8 +66,8 @@ struct ImageViewerView: View {
             .padding(.top, 12)
         }
         .overlay(alignment: .topTrailing) {
-            if images.indices.contains(selectedIndex) {
-                ShareLink(item: images[selectedIndex]) {
+            if images.indices.contains(currentPage) {
+                ShareLink(item: images[currentPage]) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(.white)
@@ -67,7 +83,7 @@ struct ImageViewerView: View {
                 HStack(spacing: 6) {
                     ForEach(0..<images.count, id: \.self) { i in
                         Circle()
-                            .fill(i == selectedIndex ? Color.white : Color.white.opacity(0.4))
+                            .fill(i == currentPage ? Color.white : Color.white.opacity(0.4))
                             .frame(width: 6, height: 6)
                     }
                 }
