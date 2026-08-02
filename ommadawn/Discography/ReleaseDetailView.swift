@@ -164,7 +164,7 @@ struct ReleaseDetailView: View {
     }
 
     private var header: some View {
-        RoundedRectangle(cornerRadius: 14)
+        Rectangle()
             .fill(.quaternary)
             .aspectRatio(1, contentMode: .fit)
             .frame(maxWidth: .infinity)
@@ -179,7 +179,6 @@ struct ReleaseDetailView: View {
                     Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.secondary)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private var editionList: some View {
