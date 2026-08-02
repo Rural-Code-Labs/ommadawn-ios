@@ -74,48 +74,8 @@ struct ReleaseDetailView: View {
                 .padding()
             }
         }
-        .navigationTitle(release.title)
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .navigationBar)
         .refreshable { await refresh() }
-        .toolbar {
-            if isAdmin {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        // Acciones del disco
-                        Button { showingEdit = true } label: {
-                            Label("Editar disco", systemImage: "pencil")
-                        }
-                        Button(role: .destructive) { showingDeleteConfirm = true } label: {
-                            Label("Eliminar disco", systemImage: "trash")
-                        }
-
-                        Divider()
-
-                        // Acciones de la edición seleccionada
-                        Button { showingCreateEdition = true } label: {
-                            Label("Nueva edición", systemImage: "plus.circle")
-                        }
-                        if selectedEdition != nil {
-                            Button { showingEditEdition = true } label: {
-                                Label("Editar edición", systemImage: "pencil.circle")
-                            }
-                            Button { showingEditionImages = true } label: {
-                                Label("Imágenes de la edición", systemImage: "photo.stack")
-                            }
-                            Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
-                                Label("Eliminar edición", systemImage: "minus.circle")
-                            }
-                        }
-                    } label: {
-                        if isDeleting || isDeletingEdition {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                    }
-                }
-            }
-        }
         // Sheets de Release
         .sheet(isPresented: $showingEdit) {
             ReleaseEditView(release: release) { updated in
@@ -178,6 +138,70 @@ struct ReleaseDetailView: View {
                 } else {
                     Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.secondary)
                 }
+            }
+            .overlay(alignment: .top) {
+                HStack(alignment: .center) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(width: 36, height: 36)
+                            .background(.regularMaterial, in: Circle())
+                    }
+
+                    Spacer()
+
+                    Text(release.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(.regularMaterial, in: Capsule())
+
+                    Spacer()
+
+                    if isAdmin {
+                        Menu {
+                            Button { showingEdit = true } label: {
+                                Label("Editar disco", systemImage: "pencil")
+                            }
+                            Button(role: .destructive) { showingDeleteConfirm = true } label: {
+                                Label("Eliminar disco", systemImage: "trash")
+                            }
+                            Divider()
+                            Button { showingCreateEdition = true } label: {
+                                Label("Nueva edición", systemImage: "plus.circle")
+                            }
+                            if selectedEdition != nil {
+                                Button { showingEditEdition = true } label: {
+                                    Label("Editar edición", systemImage: "pencil.circle")
+                                }
+                                Button { showingEditionImages = true } label: {
+                                    Label("Imágenes de la edición", systemImage: "photo.stack")
+                                }
+                                Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
+                                    Label("Eliminar edición", systemImage: "minus.circle")
+                                }
+                            }
+                        } label: {
+                            Group {
+                                if isDeleting || isDeletingEdition {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "ellipsis")
+                                        .font(.system(size: 17, weight: .semibold))
+                                        .foregroundStyle(.primary)
+                                }
+                            }
+                            .frame(width: 36, height: 36)
+                            .background(.regularMaterial, in: Circle())
+                        }
+                    } else {
+                        Color.clear.frame(width: 36, height: 36)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
             }
     }
 
