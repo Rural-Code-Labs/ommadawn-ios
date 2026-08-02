@@ -48,29 +48,31 @@ struct ReleaseDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
+            VStack(alignment: .leading, spacing: 0) {
                 header
 
-                if release.editions.isEmpty {
-                    ContentUnavailableView(
-                        "Sin ediciones todavía",
-                        systemImage: "circle.dashed",
-                        description: Text("Esta obra aún no tiene ninguna edición publicada.")
-                    )
-                    .padding(.top, 40)
-                } else {
-                    if release.editions.count > 1 {
-                        editionList
-                    }
-                    if let edition = selectedEdition {
-                        editionMeta(edition)
-                        if !edition.tracks.isEmpty {
-                            tracklist(edition.tracks)
+                VStack(alignment: .leading, spacing: 24) {
+                    if release.editions.isEmpty {
+                        ContentUnavailableView(
+                            "Sin ediciones todavía",
+                            systemImage: "circle.dashed",
+                            description: Text("Esta obra aún no tiene ninguna edición publicada.")
+                        )
+                        .padding(.top, 40)
+                    } else {
+                        if release.editions.count > 1 {
+                            editionList
+                        }
+                        if let edition = selectedEdition {
+                            editionMeta(edition)
+                            if !edition.tracks.isEmpty {
+                                tracklist(edition.tracks)
+                            }
                         }
                     }
                 }
+                .padding()
             }
-            .padding()
         }
         .navigationTitle(release.title)
         .navigationBarTitleDisplayMode(.inline)
@@ -165,7 +167,6 @@ struct ReleaseDetailView: View {
         RoundedRectangle(cornerRadius: 14)
             .fill(.quaternary)
             .aspectRatio(1, contentMode: .fit)
-            .frame(maxWidth: 280)
             .frame(maxWidth: .infinity)
             .overlay {
                 if let url = selectedEdition.flatMap(coverURL) ?? release.coverURL {
