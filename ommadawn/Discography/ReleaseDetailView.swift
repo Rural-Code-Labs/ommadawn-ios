@@ -524,7 +524,7 @@ private struct EditionFilterSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                if availableFormats.count > 1 {
+                if !availableFormats.isEmpty {
                     Section("Tipo") {
                         ForEach(availableFormats, id: \.self) { format in
                             FilterRow(
@@ -536,7 +536,7 @@ private struct EditionFilterSheet: View {
                         }
                     }
                 }
-                if availableYears.count > 1 {
+                if !availableYears.isEmpty {
                     Section("Año") {
                         ForEach(availableYears, id: \.self) { year in
                             FilterRow(
@@ -548,7 +548,7 @@ private struct EditionFilterSheet: View {
                         }
                     }
                 }
-                if availableLabels.count > 1 {
+                if !availableLabels.isEmpty {
                     Section("Sello") {
                         ForEach(availableLabels, id: \.self) { label in
                             FilterRow(
