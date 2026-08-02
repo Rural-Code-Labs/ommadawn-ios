@@ -13,6 +13,7 @@ import OmmadawnAPI
 struct AccountMenu: View {
     let user: User
     @Environment(AuthSession.self) private var session
+    @AppStorage("appearance") private var theme: AppTheme = .system
 
     @State private var showingProfile = false
 
@@ -23,6 +24,17 @@ struct AccountMenu: View {
                     showingProfile = true
                 } label: {
                     Label("Editar perfil", systemImage: "person.crop.circle")
+                }
+            }
+
+            Section("Apariencia") {
+                Picker("Apariencia", selection: $theme) {
+                    ForEach(AppTheme.allCases, id: \.self) { option in
+                        Label(option.label, systemImage: option.iconName).tag(option)
+                    }
+                }
+                .onChange(of: theme) { _, newValue in
+                    Task { try? await session.updateProfile(themePreference: newValue.apiValue) }
                 }
             }
 

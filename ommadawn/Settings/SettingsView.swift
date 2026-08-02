@@ -14,7 +14,6 @@ struct SettingsView: View {
     let user: User
     @Environment(\.dismiss) private var dismiss
     @Environment(AuthSession.self) private var session
-    @AppStorage("appearance") private var theme: AppTheme = .system
 
     @State private var showingAdminUsers = false
     @State private var pendingEnvironment: APIEnvironment?
@@ -22,20 +21,6 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Apariencia") {
-                    Picker("Color de la app", selection: $theme) {
-                        ForEach(AppTheme.allCases, id: \.self) { option in
-                            Label(option.label, systemImage: option.iconName)
-                                .tag(option)
-                        }
-                    }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
-                    .onChange(of: theme) { _, newValue in
-                        Task { try? await session.updateProfile(themePreference: newValue.apiValue) }
-                    }
-                }
-
                 if user.is_super_admin {
                     Section("Administración") {
                         Button {

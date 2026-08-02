@@ -62,16 +62,18 @@ private struct AppHeaderBar: View {
             AccountMenu(user: user)
         }
         .overlay(alignment: .trailing) {
-            Button {
-                showingSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 20))
-                    .foregroundStyle(.primary)
+            if user.is_admin {
+                Button {
+                    showingSettings = true
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 20))
+                        .foregroundStyle(.primary)
+                }
+                .buttonStyle(.plain)
+                .padding()
+                .accessibilityLabel("Ajustes")
             }
-            .buttonStyle(.plain)
-            .padding()
-            .accessibilityLabel("Ajustes")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
