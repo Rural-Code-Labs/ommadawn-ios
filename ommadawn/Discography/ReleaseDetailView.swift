@@ -88,22 +88,6 @@ struct ReleaseDetailView: View {
                             description: Text("Esta obra aún no tiene ninguna edición publicada.")
                         )
                     } else {
-                        Button {
-                            showingEditionList = true
-                        } label: {
-                            HStack {
-                                Text("Ver todas las ediciones (\(release.editions.count))")
-                                    .font(.subheadline)
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .foregroundStyle(.primary)
-                            .padding(12)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
-                        }
-
                         if let edition = selectedEdition {
                             editionMeta(edition)
                             if !edition.tracks.isEmpty {
@@ -193,6 +177,24 @@ struct ReleaseDetailView: View {
                     }
                 } else {
                     Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.secondary)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if release.editions.count > 1 {
+                    Button { showingEditionList = true } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "rectangle.stack.fill")
+                                .font(.system(size: 13))
+                            Text("\(release.editions.count)")
+                                .font(.system(size: 13, weight: .semibold))
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(.regularMaterial, in: Capsule())
+                    }
+                    .padding(12)
                 }
             }
             .overlay(alignment: .top) {
