@@ -282,7 +282,8 @@ struct ReleaseDetailView: View {
 
     private func editionMeta(_ edition: Edition) -> some View {
         HStack(spacing: 6) {
-            if let country = edition.country { Text(country) }
+            if let c = Country.find(edition.country) { Text(c.displayName) }
+            else if let raw = edition.country { Text(raw) }
             if let label = edition.label { Text("·"); Text(label) }
             if let year = edition.release_date?.prefix(4) { Text("·"); Text(year) }
         }
@@ -370,7 +371,7 @@ private struct EditionRow: View {
 
             // Metadatos
             VStack(alignment: .leading, spacing: 2) {
-                Text(edition.edition_name ?? edition.country ?? "Edición")
+                Text(edition.edition_name ?? Country.find(edition.country)?.displayName ?? edition.country ?? "Edición")
                     .font(.body)
                     .lineLimit(1)
 

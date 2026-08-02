@@ -70,6 +70,38 @@ con otra base de código.
   Picker inline con confirmación de alerta) y en `LoginView` (badge de antena al pie del
   formulario con `confirmationDialog`, para poder cambiar antes de autenticarse). En
   builds de Release no aparece nada.
+- **UX del detalle de release (2 ago 2026)**:
+  - **Badge de ediciones en portada**: pildora flotante en la esquina inferior derecha
+    de la imagen de portada con icono `rectangle.stack.fill` y el número de ediciones
+    (solo si hay más de una). Color `.tint` para visibilidad en modo claro y oscuro.
+  - **Hoja de ediciones con filtros**: `EditionListSheet` gana filtros multi-selección
+    (Tipo, Año, Sello) con icono relleno cuando hay filtro activo y botón "Restablecer".
+    Las secciones de filtro se muestran incluso cuando solo hay un valor único.
+  - **Visor de imágenes corregido**: `ImageViewerView` reescrito con `ScrollViewReader` +
+    `HStack` (no `LazyHStack`) y `proxy.scrollTo` diferido en `DispatchQueue.main.async`
+    para abrir siempre en la imagen tapeada, no en la primera. `fullScreenCover(item:)`
+    con `ImageViewerItem: Identifiable` captura el índice de forma atómica en el tap.
+- **Engranaje de ajustes solo para admins (2 ago 2026)**: el botón de engranaje en
+  `AppHeaderBar` se envuelve en `if user.is_admin`. El selector de apariencia se mueve
+  del `SettingsView` al `AccountMenu` (sección "Apariencia" con `Picker` + `.onChange`
+  que sincroniza con el servidor).
+- **Banderas de países y selector de país (2 ago 2026)**:
+  - **`Shared/Country.swift`**: modelo `Country` (código ISO 3166-1 alpha-2, nombre en
+    español vía `Locale(identifier: "es")`, bandera emoji). La lista se genera con
+    `NSLocale.isoCountryCodes` (solo países soberanos reales) más una `extraCodes`
+    whitelist para códigos supranacionales que la API acepta: actualmente `["EU"]`
+    (Unión Europea). El campo `country` de la API valida `^[A-Z]{2}$`; la validación de
+    negocio del servidor admite los extras. `String.flagEmoji` convierte alpha-2 →
+    Regional Indicator emoji.
+  - **`Shared/CountryPickerView.swift`**: hoja reutilizable con sección "Frecuentes"
+    (GB, DE, US, JP, NL, FR, IT, AU, CA, ES) siempre visible, buscador permanente en la
+    cabecera de la lista (no `.searchable` de iOS, que en iOS 26 se mueve abajo) y
+    botón "Quitar país" cuando hay selección.
+  - El `TextField` de país en `EditionEditView` y `AccountProfileView` se reemplaza por
+    un `Button` que abre `CountryPickerView` como hoja. El campo `country` de
+    `EditionPayload` pasa de `String` a `String?`.
+  - Las ediciones muestran la bandera del país en `ReleaseDetailView` (en `editionMeta`
+    y en el título de `EditionRow` cuando no hay `edition_name`).
 - **Pendiente para cerrar Fase 4**: revisar y pulir UX (bugs, detalles de diseño) a decidir con el usuario.
 
 ### Backlog de mejoras acordadas (Fase 4)
@@ -78,7 +110,7 @@ Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 
 | # | Mejora | Requiere API |
 |---|---|---|
-| 1 | **Rediseño de vista de discografía**: portada completa en detalle (ocupa más espacio, ediciones en hoja o sección expandible), galería con primera foto grande y resto en miniaturas, y países con bandera (lista fija ISO 3166 + emoji) en perfil de usuario y campo país de edición. | 🟢 Solo app |
+| 1 | **Rediseño de vista de discografía**: portada completa en detalle (ocupa más espacio, ediciones en hoja o sección expandible), galería con primera foto grande y resto en miniaturas. ~~Países con bandera~~: ✅ hecho (2 ago 2026). | 🟢 Solo app |
 | 2 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. Necesita un endpoint de sellos en la API. | 🔴 API: endpoint `/labels` (listado + creación) |
 | 3 | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios; un admin los aprueba/rechaza. Necesita modelo de contribuciones en la API y pantalla de revisión en la app. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
 | 4 | **Colección personal**: cada usuario puede marcar qué ediciones tiene en su colección con el estado del disco y la funda (p. ej. Mint / Near Mint / Very Good+ / Very Good / Good / Fair / Poor — escala Discogs). Implica una vista de colección propia y un botón en el detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas opcionales), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
@@ -308,6 +340,9 @@ ommadawn/
 │   │   ├── EditionEditView.swift        # crear/editar/eliminar edición + tracklist
 │   │   ├── EditionImagesView.swift      # gestión de imágenes de edición
 │   │   └── Release+Presentation.swift
+│   ├── Shared/                   # Componentes reutilizables entre dominios
+│   │   ├── Country.swift              # modelo Country + NSLocale.isoCountryCodes + extraCodes
+│   │   └── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
 │   ├── Design/
 │   │   ├── BrandMark.swift      # el logo "O" en Didot Italic como vista reutilizable
 │   │   ├── AppTheme.swift       # AppTheme + extensión apiValue/init(from:) para sincronizar con API

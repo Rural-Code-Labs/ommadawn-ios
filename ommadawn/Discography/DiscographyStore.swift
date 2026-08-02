@@ -24,7 +24,7 @@ enum DiscographyError: Error {
 /// tipos generados. Lo construye `EditionEditView` y lo consume el store.
 struct EditionPayload {
     var editionName: String = ""
-    var country: String = ""
+    var country: String? = nil
     var label: String = ""
     var catalogNumber: String = ""
     var releaseDate: String? = nil     // "YYYY-MM-DD" o nil
@@ -173,7 +173,7 @@ struct DiscographyStore {
     func createEdition(releaseID: Int, data: EditionPayload) async throws -> Edition {
         do {
             let body = Components.Schemas.EditionCreate(
-                country: data.country.nilIfEmpty,
+                country: data.country,
                 label: data.label.nilIfEmpty,
                 edition_name: data.editionName.nilIfEmpty,
                 catalog_number: data.catalogNumber.nilIfEmpty,
@@ -202,7 +202,7 @@ struct DiscographyStore {
     func updateEdition(releaseID: Int, editionID: Int, data: EditionPayload) async throws -> Edition {
         do {
             let body = Components.Schemas.EditionUpdate(
-                country: data.country.nilIfEmpty,
+                country: data.country,
                 label: data.label.nilIfEmpty,
                 edition_name: data.editionName.nilIfEmpty,
                 catalog_number: data.catalogNumber.nilIfEmpty,

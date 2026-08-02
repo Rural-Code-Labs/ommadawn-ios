@@ -25,7 +25,8 @@ struct EditionEditView: View {
 
     // MARK: - Metadatos
     @State private var editionName: String
-    @State private var country: String
+    @State private var countryCode: String?
+    @State private var showingCountryPicker = false
     @State private var label: String
     @State private var catalogNumber: String
     @State private var format: EditionFormat?
@@ -48,7 +49,7 @@ struct EditionEditView: View {
         self.onSave = onSave
 
         _editionName   = State(initialValue: edition?.edition_name ?? "")
-        _country       = State(initialValue: edition?.country ?? "")
+        _countryCode   = State(initialValue: edition?.country)
         _label         = State(initialValue: edition?.label ?? "")
         _catalogNumber = State(initialValue: edition?.catalog_number ?? "")
         _format        = State(initialValue: edition?.format)
@@ -111,9 +112,18 @@ struct EditionEditView: View {
                 TextField("Edición original, Remasterizada…", text: $editionName)
                     .multilineTextAlignment(.trailing)
             }
-            LabeledContent("País") {
-                TextField("España, UK, US…", text: $country)
-                    .multilineTextAlignment(.trailing)
+            Button { showingCountryPicker = true } label: {
+                LabeledContent("País") {
+                    if let c = Country.find(countryCode) {
+                        Text(c.displayName).foregroundStyle(.primary)
+                    } else {
+                        Text("Sin especificar").foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .foregroundStyle(.primary)
+            .sheet(isPresented: $showingCountryPicker) {
+                CountryPickerView(selectedCode: $countryCode)
             }
             LabeledContent("Sello") {
                 TextField("Virgin, Polydor…", text: $label)
@@ -182,7 +192,7 @@ struct EditionEditView: View {
 
         let payload = EditionPayload(
             editionName: editionName,
-            country: country,
+            country: countryCode,
             label: label,
             catalogNumber: catalogNumber,
             releaseDate: includesDate ? Self.dateFormatter.string(from: releaseDate) : nil,

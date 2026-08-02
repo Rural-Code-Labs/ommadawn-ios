@@ -27,7 +27,8 @@ struct AccountProfileView: View {
 
     @State private var hasLoadedForm = false
     @State private var fullName = ""
-    @State private var country = ""
+    @State private var countryCode: String?
+    @State private var showingCountryPicker = false
     @State private var city = ""
     @State private var includesBirthDate = false
     @State private var birthDate = Date.now
@@ -58,9 +59,18 @@ struct AccountProfileView: View {
                         TextField("", text: $fullName)
                             .multilineTextAlignment(.trailing)
                     }
-                    LabeledContent("País") {
-                        TextField("", text: $country)
-                            .multilineTextAlignment(.trailing)
+                    Button { showingCountryPicker = true } label: {
+                        LabeledContent("País") {
+                            if let c = Country.find(countryCode) {
+                                Text(c.displayName).foregroundStyle(.primary)
+                            } else {
+                                Text("Sin especificar").foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                    .sheet(isPresented: $showingCountryPicker) {
+                        CountryPickerView(selectedCode: $countryCode)
                     }
                     LabeledContent("Ciudad") {
                         TextField("", text: $city)
@@ -98,7 +108,7 @@ struct AccountProfileView: View {
             .task {
                 guard !hasLoadedForm, let user else { return }
                 fullName = user.full_name ?? ""
-                country = user.country ?? ""
+                countryCode = user.country
                 city = user.city ?? ""
                 if let parsed = user.birth_date.flatMap(Self.dateOnlyFormatter.date(from:)) {
                     birthDate = parsed
@@ -188,13 +198,12 @@ struct AccountProfileView: View {
         defer { isSaving = false }
 
         let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedCountry = country.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedCity = city.trimmingCharacters(in: .whitespacesAndNewlines)
 
         do {
             try await session.updateProfile(
                 fullName: trimmedName.isEmpty ? nil : trimmedName,
-                country: trimmedCountry.isEmpty ? nil : trimmedCountry,
+                country: countryCode,
                 city: trimmedCity.isEmpty ? nil : trimmedCity,
                 birthDate: includesBirthDate ? Self.dateOnlyFormatter.string(from: birthDate) : nil
             )
