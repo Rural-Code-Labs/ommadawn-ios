@@ -29,6 +29,9 @@ struct ReleaseDetailView: View {
     @State private var showingDeleteEditionConfirm = false
     @State private var isDeletingEdition = false
     @State private var showingEditionImages = false
+    @State private var showingEditionList = false
+    @State private var showingImageViewer = false
+    @State private var viewerStartIndex = 0
 
     init(release: Release) {
         _release = State(initialValue: release)
@@ -46,23 +49,50 @@ struct ReleaseDetailView: View {
         release.editions.first { $0.id == selectedEditionID } ?? release.displayEdition
     }
 
+    private var editionImages: [ReleaseImage] {
+        selectedEdition?.images ?? []
+    }
+
+    private var editionImageURLs: [URL] {
+        editionImages.compactMap { URL(string: $0.url) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
 
-                VStack(alignment: .leading, spacing: 24) {
+                if !editionImages.isEmpty {
+                    galleryStrip
+                }
+
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(release.title)
+                        .font(.title2.bold())
+
                     if release.editions.isEmpty {
                         ContentUnavailableView(
                             "Sin ediciones todavía",
                             systemImage: "circle.dashed",
                             description: Text("Esta obra aún no tiene ninguna edición publicada.")
                         )
-                        .padding(.top, 40)
                     } else {
-                        if release.editions.count > 1 {
-                            editionList
+                        Button {
+                            showingEditionList = true
+                        } label: {
+                            HStack {
+                                Text("Ver todas las ediciones (\(release.editions.count))")
+                                    .font(.subheadline)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .foregroundStyle(.primary)
+                            .padding(12)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
                         }
+
                         if let edition = selectedEdition {
                             editionMeta(edition)
                             if !edition.tracks.isEmpty {
@@ -76,6 +106,15 @@ struct ReleaseDetailView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .refreshable { await refresh() }
+        .fullScreenCover(isPresented: $showingImageViewer) {
+            ImageViewerView(images: editionImageURLs, selectedIndex: viewerStartIndex)
+        }
+        .sheet(isPresented: $showingEditionList) {
+            EditionListSheet(
+                release: release,
+                selectedEditionID: $selectedEditionID
+            )
+        }
         // Sheets de Release
         .sheet(isPresented: $showingEdit) {
             ReleaseEditView(release: release) { updated in
@@ -135,6 +174,12 @@ struct ReleaseDetailView: View {
                     } placeholder: {
                         Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.secondary)
                     }
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        guard !editionImages.isEmpty else { return }
+                        viewerStartIndex = editionImages.firstIndex(where: { $0.image_type == .front_cover }) ?? 0
+                        showingImageViewer = true
+                    }
                 } else {
                     Image(systemName: "opticaldisc").font(.system(size: 40)).foregroundStyle(.secondary)
                 }
@@ -148,15 +193,6 @@ struct ReleaseDetailView: View {
                             .frame(width: 36, height: 36)
                             .background(.regularMaterial, in: Circle())
                     }
-
-                    Spacer()
-
-                    Text(release.title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(.regularMaterial, in: Capsule())
 
                     Spacer()
 
@@ -205,24 +241,27 @@ struct ReleaseDetailView: View {
             }
     }
 
-    private var editionList: some View {
-        VStack(spacing: 0) {
-            ForEach(release.editions, id: \.id) { edition in
-                EditionRow(
-                    edition: edition,
-                    coverURL: coverURL(of: edition),
-                    isSelected: edition.id == selectedEditionID
-                )
-                .contentShape(Rectangle())
-                .onTapGesture { selectedEditionID = edition.id }
-
-                if edition.id != release.editions.last?.id {
-                    Divider().padding(.leading, 72)
+    private var galleryStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(Array(editionImages.enumerated()), id: \.offset) { index, img in
+                    AsyncImage(url: URL(string: img.url)) { image in
+                        image.resizable().aspectRatio(contentMode: .fit)
+                    } placeholder: {
+                        Rectangle().fill(.quaternary)
+                    }
+                    .frame(width: 72, height: 72)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        viewerStartIndex = index
+                        showingImageViewer = true
+                    }
                 }
             }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
         }
-        .background(.background.secondary)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func editionMeta(_ edition: Edition) -> some View {
@@ -343,6 +382,47 @@ private struct EditionRow: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
+    }
+}
+
+// MARK: - Hoja de ediciones
+
+private struct EditionListSheet: View {
+    let release: Release
+    @Binding var selectedEditionID: Int?
+    @Environment(\.dismiss) private var dismiss
+
+    private func coverURL(of edition: Edition) -> URL? {
+        guard let cover = edition.images.first(where: { $0.image_type == .front_cover }) else { return nil }
+        return URL(string: cover.url)
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(release.editions, id: \.id) { edition in
+                    EditionRow(
+                        edition: edition,
+                        coverURL: coverURL(of: edition),
+                        isSelected: edition.id == selectedEditionID
+                    )
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedEditionID = edition.id
+                        dismiss()
+                    }
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle("Ediciones")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { dismiss() }
+                }
+            }
+        }
     }
 }
 
