@@ -4,6 +4,7 @@
 # Xcode — datos de usuario (no se versionan)
 xcuserdata/
 *.xcuserstate
+*.xcsettings
 
 # Build
 build/
