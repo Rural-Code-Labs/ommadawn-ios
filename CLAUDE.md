@@ -145,11 +145,14 @@ Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 
 | # | Mejora | Requiere API |
 |---|---|---|
+| 6 | **Nombre de edición en el detalle**: mostrar el `edition_name` de la edición activa junto (o bajo) el título del disco cuando está informado — p.ej. "Tubular Bells · Deluxe Edition". Ahora solo se ve el título del release. | 🟢 Solo app |
+| 7 | **Créditos por pista**: cada track puede tener sus propios créditos (ej. "Guitarra: Mike Oldfield"). Requiere nuevo campo en el modelo de track de la API y UI en `EditionEditView` para editarlos y en `ReleaseDetailView` para mostrarlos. | 🔴 API: campo `credits: String?` en `Track`, incluido en el contrato |
 | 1 | **Rediseño de vista de discografía**: portada completa en detalle (ocupa más espacio, ediciones en hoja o sección expandible), galería con primera foto grande y resto en miniaturas. ~~Países con bandera~~: ✅ hecho (2 ago 2026). | 🟢 Solo app |
 | 2 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. Necesita un endpoint de sellos en la API. | 🔴 API: endpoint `/labels` (listado + creación) |
 | 5 | ~~**Ordenar imágenes "Otras" de una edición**~~: ✅ hecho (4 ago 2026) — botones ↑↓ en `EditionEditView`, API con `position` + `PATCH .../images/{id}/position`. | ✅ |
 | 3 | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios; un admin los aprueba/rechaza. Necesita modelo de contribuciones en la API y pantalla de revisión en la app. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
 | 4 | **Colección personal**: cada usuario puede marcar qué ediciones tiene en su colección con el estado del disco y la funda (p. ej. Mint / Near Mint / Very Good+ / Very Good / Good / Fair / Poor — escala Discogs). Implica una vista de colección propia y un botón en el detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas opcionales), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
+| 8 | **Colecciones de ediciones** *(idea a largo plazo)*: agrupar varias ediciones bajo un nombre de colección (p. ej. "Deluxe Edition Box Set" agrupa la edición original + el bonus disc + el DVD). Una colección es una lista ordenada de ediciones con nombre propio. Útil para cajas y ediciones multi-disco. | 🔴 API: modelo `EditionCollection` (name, ordered list of edition IDs), endpoints CRUD |
 
 ### Backlog de mejoras de autenticación
 
