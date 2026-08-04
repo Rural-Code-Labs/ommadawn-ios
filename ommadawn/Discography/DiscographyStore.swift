@@ -277,6 +277,27 @@ struct DiscographyStore {
         catch { throw DiscographyError.network(error) }
     }
 
+    func moveEditionImage(releaseID: Int, editionID: Int, imageID: Int, direction: Components.Schemas.ImageMoveRequest.directionPayload) async throws -> [ReleaseImage] {
+        do {
+            let output = try await client.move_image_api_v1_discography_releases__release_id__editions__edition_id__images__image_id__position_patch(
+                .init(
+                    path: .init(release_id: releaseID, edition_id: editionID, image_id: imageID),
+                    body: .json(.init(direction: direction))
+                )
+            )
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .badRequest: throw DiscographyError.unexpected(400)
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
     func deleteEditionImage(releaseID: Int, editionID: Int, imageID: Int) async throws {
         do {
             let output = try await client.delete_image_api_v1_discography_releases__release_id__editions__edition_id__images__image_id__delete(

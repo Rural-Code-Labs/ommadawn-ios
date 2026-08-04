@@ -55,10 +55,9 @@ con otra base de código.
      (modelo local con `durationText` "M:SS") y se envían como array completo en el PATCH.
      Nota: `.environment(\.editMode, .constant(.active))` bloquea taps en Buttons — se usan
      botones ⊖ inline en cada fila en vez de `.onDelete`.
-  3. **Capa 3 — Imágenes de edición**: `EditionImagesView` (hoja: ver miniaturas, subir con
-     `PhotosPicker`, eliminar). `ImageUpload.swift` en `OmmadawnAPI`: multipart a mano con
-     MIME real (mismo patrón que `AvatarUpload`). El caso 413 en el contrato generado se
-     llama `.contentTooLarge`.
+  3. **Capa 3 — Imágenes de edición**: `ImageUpload.swift` en `OmmadawnAPI`: multipart a mano
+     con MIME real (mismo patrón que `AvatarUpload`). El caso 413 en el contrato generado se
+     llama `.contentTooLarge`. La UI de imágenes se integró en `EditionEditView` (ver abajo).
 - **Lista de ediciones en detalle (30 jul 2026)**: el `Picker` segmentado se reemplazó por
   una lista de filas (`EditionRow`) con miniatura de portada, nombre, formato · año · sello
   y checkmark en la edición seleccionada. Al tocar una fila se actualiza el detalle.
@@ -102,6 +101,19 @@ con otra base de código.
     `EditionPayload` pasa de `String` a `String?`.
   - Las ediciones muestran la bandera del país en `ReleaseDetailView` (en `editionMeta`
     y en el título de `EditionRow` cuando no hay `edition_name`).
+  - `EditionListSheet` incluye filtro multi-selección por país (además de Tipo, Año, Sello).
+    Las banderas aparecen como overlay 20pt en la esquina inferior derecha de cada miniatura.
+- **Imágenes de edición integradas en `EditionEditView` (4 ago 2026)**:
+  - La hoja `EditionImagesView` se elimina; la sección "Imágenes" se muestra directamente
+    en el formulario de edición (solo en modo editar). Subir/eliminar son llamadas inmediatas
+    a la API (sin esperar a "Guardar"), coexisten con el botón "Guardar" de metadatos.
+  - **Unicidad de portada/contraportada**: el `Picker` de tipo oculta "Portada" / "Contraportada"
+    si ya existe una imagen de ese tipo; `adjustImageType` cambia el selector a "Otra"
+    automáticamente cuando un tipo se llena.
+  - **Ordenación de imágenes**: botones ↑↓ en cada fila (`chevron.up` / `chevron.down`).
+    Llaman a `PATCH .../images/{id}/position` (`ImageMoveRequest { direction: "up"|"down" }`),
+    que devuelve el array completo ya ordenado (`[ImageRead]`); `DiscographyStore.moveEditionImage`
+    devuelve `[ReleaseImage]`. Las imágenes se muestran ordenadas por `position`.
 - **Pendiente para cerrar Fase 4**: revisar y pulir UX (bugs, detalles de diseño) a decidir con el usuario.
 
 ### Backlog de mejoras acordadas (Fase 4)
@@ -112,6 +124,7 @@ Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 |---|---|---|
 | 1 | **Rediseño de vista de discografía**: portada completa en detalle (ocupa más espacio, ediciones en hoja o sección expandible), galería con primera foto grande y resto en miniaturas. ~~Países con bandera~~: ✅ hecho (2 ago 2026). | 🟢 Solo app |
 | 2 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. Necesita un endpoint de sellos en la API. | 🔴 API: endpoint `/labels` (listado + creación) |
+| 5 | ~~**Ordenar imágenes "Otras" de una edición**~~: ✅ hecho (4 ago 2026) — botones ↑↓ en `EditionEditView`, API con `position` + `PATCH .../images/{id}/position`. | ✅ |
 | 3 | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios; un admin los aprueba/rechaza. Necesita modelo de contribuciones en la API y pantalla de revisión en la app. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
 | 4 | **Colección personal**: cada usuario puede marcar qué ediciones tiene en su colección con el estado del disco y la funda (p. ej. Mint / Near Mint / Very Good+ / Very Good / Good / Fair / Poor — escala Discogs). Implica una vista de colección propia y un botón en el detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas opcionales), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
 
@@ -337,8 +350,7 @@ ommadawn/
 │   │   ├── ReleaseListView.swift
 │   │   ├── ReleaseDetailView.swift
 │   │   ├── ReleaseEditView.swift        # crear/editar/eliminar disco (solo admins)
-│   │   ├── EditionEditView.swift        # crear/editar/eliminar edición + tracklist
-│   │   ├── EditionImagesView.swift      # gestión de imágenes de edición
+│   │   ├── EditionEditView.swift        # crear/editar/eliminar edición + tracklist + imágenes
 │   │   └── Release+Presentation.swift
 │   ├── Shared/                   # Componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + NSLocale.isoCountryCodes + extraCodes

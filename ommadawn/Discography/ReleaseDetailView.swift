@@ -34,7 +34,6 @@ struct ReleaseDetailView: View {
     @State private var showingEditEdition = false
     @State private var showingDeleteEditionConfirm = false
     @State private var isDeletingEdition = false
-    @State private var showingEditionImages = false
     @State private var showingEditionList = false
     @State private var imageViewerItem: ImageViewerItem?
 
@@ -147,12 +146,7 @@ struct ReleaseDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingEditionImages, onDismiss: { Task { await refresh() } }) {
-            if let edition = selectedEdition {
-                EditionImagesView(release: release, edition: edition)
-            }
-        }
-        .confirmationDialog(
+.confirmationDialog(
             "¿Eliminar edición de \"\(release.title)\"?",
             isPresented: $showingDeleteEditionConfirm,
             titleVisibility: .visible
@@ -231,10 +225,7 @@ struct ReleaseDetailView: View {
                                 Button { showingEditEdition = true } label: {
                                     Label("Editar edición", systemImage: "pencil.circle")
                                 }
-                                Button { showingEditionImages = true } label: {
-                                    Label("Imágenes de la edición", systemImage: "photo.stack")
-                                }
-                                Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
+Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
                                     Label("Eliminar edición", systemImage: "minus.circle")
                                 }
                             }
@@ -368,6 +359,12 @@ private struct EditionRow: View {
             }
             .frame(width: 52, height: 52)
             .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(alignment: .bottomTrailing) {
+                if let flag = Country.find(edition.country)?.flag {
+                    Text(flag)
+                        .font(.system(size: 20))
+                }
+            }
 
             // Metadatos
             VStack(alignment: .leading, spacing: 2) {
@@ -413,6 +410,7 @@ private struct EditionListSheet: View {
     @State private var selectedFormats: Set<String> = []
     @State private var selectedYears: Set<String> = []
     @State private var selectedLabels: Set<String> = []
+    @State private var selectedCountries: Set<String> = []
 
     private func coverURL(of edition: Edition) -> URL? {
         guard let cover = edition.images.first(where: { $0.image_type == .front_cover }) else { return nil }
@@ -433,10 +431,19 @@ private struct EditionListSheet: View {
         Array(Set(release.editions.compactMap { $0.label })).sorted()
     }
 
+    private var availableCountries: [String] {
+        Array(Set(release.editions.compactMap { $0.country })).sorted {
+            let a = Country.find($0)?.name ?? $0
+            let b = Country.find($1)?.name ?? $1
+            return a.localizedStandardCompare(b) == .orderedAscending
+        }
+    }
+
     private var activeFilterCount: Int {
         (selectedFormats.isEmpty ? 0 : 1) +
         (selectedYears.isEmpty ? 0 : 1) +
-        (selectedLabels.isEmpty ? 0 : 1)
+        (selectedLabels.isEmpty ? 0 : 1) +
+        (selectedCountries.isEmpty ? 0 : 1)
     }
 
     private var filteredEditions: [Edition] {
@@ -447,7 +454,9 @@ private struct EditionListSheet: View {
                 edition.release_date.map { selectedYears.contains(String($0.prefix(4))) } == true
             let labelOK = selectedLabels.isEmpty ||
                 edition.label.map { selectedLabels.contains($0) } == true
-            return formatOK && yearOK && labelOK
+            let countryOK = selectedCountries.isEmpty ||
+                edition.country.map { selectedCountries.contains($0) } == true
+            return formatOK && yearOK && labelOK && countryOK
         }
     }
 
@@ -498,9 +507,11 @@ private struct EditionListSheet: View {
                     availableFormats: availableFormats,
                     availableYears: availableYears,
                     availableLabels: availableLabels,
+                    availableCountries: availableCountries,
                     selectedFormats: $selectedFormats,
                     selectedYears: $selectedYears,
-                    selectedLabels: $selectedLabels
+                    selectedLabels: $selectedLabels,
+                    selectedCountries: $selectedCountries
                 )
             }
         }
@@ -513,13 +524,16 @@ private struct EditionFilterSheet: View {
     let availableFormats: [String]
     let availableYears: [String]
     let availableLabels: [String]
+    let availableCountries: [String]
     @Binding var selectedFormats: Set<String>
     @Binding var selectedYears: Set<String>
     @Binding var selectedLabels: Set<String>
+    @Binding var selectedCountries: Set<String>
     @Environment(\.dismiss) private var dismiss
 
     private var hasActiveFilters: Bool {
-        !selectedFormats.isEmpty || !selectedYears.isEmpty || !selectedLabels.isEmpty
+        !selectedFormats.isEmpty || !selectedYears.isEmpty ||
+        !selectedLabels.isEmpty || !selectedCountries.isEmpty
     }
 
     var body: some View {
@@ -561,6 +575,19 @@ private struct EditionFilterSheet: View {
                         }
                     }
                 }
+                if !availableCountries.isEmpty {
+                    Section("País") {
+                        ForEach(availableCountries, id: \.self) { code in
+                            let country = Country.find(code)
+                            FilterRow(
+                                title: country?.displayName ?? code,
+                                isSelected: selectedCountries.contains(code)
+                            ) {
+                                selectedCountries.toggle(code)
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle("Filtros")
             .navigationBarTitleDisplayMode(.inline)
@@ -570,6 +597,7 @@ private struct EditionFilterSheet: View {
                         selectedFormats = []
                         selectedYears = []
                         selectedLabels = []
+                        selectedCountries = []
                     }
                     .disabled(!hasActiveFilters)
                 }

@@ -29,10 +29,10 @@ para esta app. Android queda para el futuro con otra base de código.
   (solo visible a admins); perfil de usuario editable con avatar y selector de país con
   bandera; ajustes de apariencia sincronizados con el servidor (en el menú de cuenta);
   gestión de administradores para superadmins; pantalla "Acerca de"; edición completa
-  del catálogo para admins (disco, edición, tracklist e imágenes); badge de ediciones
-  en portada; filtros multi-selección en la hoja de ediciones; selector de país con
-  frecuentes y buscador (soporta "EU" — Unión Europea — para ediciones europeas).
-  Pendiente: revisar y pulir UX.
+  del catálogo para admins (disco, edición, tracklist e imágenes con ↑↓ ordenación);
+  badge de ediciones en portada; filtros multi-selección (tipo, año, sello, país) en la
+  hoja de ediciones con banderas; selector de país con frecuentes y buscador (soporta
+  "EU" — Unión Europea). Pendiente: revisar y pulir UX.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -103,8 +103,7 @@ ommadawn/
 │   │   ├── ReleaseListView.swift
 │   │   ├── ReleaseDetailView.swift
 │   │   ├── ReleaseEditView.swift       # crear/editar/eliminar disco (solo admins)
-│   │   ├── EditionEditView.swift       # crear/editar/eliminar edición + tracklist
-│   │   ├── EditionImagesView.swift     # gestión de imágenes de edición
+│   │   ├── EditionEditView.swift       # crear/editar/eliminar edición + tracklist + imágenes
 │   │   └── Release+Presentation.swift
 │   ├── Shared/                        # componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + lista ISO 3166-1 + "EU"

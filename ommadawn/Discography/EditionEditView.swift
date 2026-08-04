@@ -13,6 +13,7 @@
 //
 
 import SwiftUI
+import PhotosUI
 import OmmadawnAPI
 
 struct EditionEditView: View {
@@ -38,6 +39,14 @@ struct EditionEditView: View {
 
     // MARK: - Tracklist
     @State private var tracks: [EditableTrack]
+
+    // MARK: - Imágenes (solo en modo edición)
+    @State private var images: [ReleaseImage]
+    @State private var selectedImageType: ReleaseImageType = .front_cover
+    @State private var photoPickerItem: PhotosPickerItem?
+    @State private var isUploadingImage = false
+    @State private var deletingImageID: Int?
+    @State private var movingImageID: Int?
 
     // MARK: - Estado de UI
     @State private var isSaving = false
@@ -69,6 +78,7 @@ struct EditionEditView: View {
         _tracks = State(initialValue: edition?.tracks
             .sorted { $0.position < $1.position }
             .map { EditableTrack(from: $0) } ?? [])
+        _images = State(initialValue: edition?.images ?? [])
     }
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
@@ -80,6 +90,7 @@ struct EditionEditView: View {
                 metadataSection
                 detailsSection
                 tracklistSection
+                if isEditing { imagesSection }
                 if let errorMessage {
                     Section {
                         Text(errorMessage).foregroundStyle(.red)
@@ -99,6 +110,10 @@ struct EditionEditView: View {
                         Button("Guardar") { Task { await save() } }
                     }
                 }
+            }
+            .onChange(of: photoPickerItem) { _, item in
+                guard let item else { return }
+                Task { await uploadPhoto(item) }
             }
             .disabled(isSaving)
         }
@@ -180,6 +195,160 @@ struct EditionEditView: View {
             } label: {
                 Label("Añadir tema", systemImage: "plus.circle")
             }
+        }
+    }
+
+    // MARK: - Imágenes
+
+    private var imagesSection: some View {
+        Section("Imágenes") {
+            if images.isEmpty {
+                Text("Sin imágenes todavía")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(images.sorted { $0.position < $1.position }, id: \.id) { image in
+                    HStack(spacing: 12) {
+                        AsyncImage(url: URL(string: image.url)) { img in
+                            img.resizable().aspectRatio(contentMode: .fill)
+                        } placeholder: {
+                            Color.secondary.opacity(0.2)
+                        }
+                        .frame(width: 48, height: 48)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(imageTypeName(image.image_type)).font(.body)
+                            Text(image.url.components(separatedBy: "/").last ?? "")
+                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                        Spacer()
+                        if movingImageID == image.id || deletingImageID == image.id {
+                            ProgressView()
+                        } else {
+                            Button { Task { await moveImage(image, direction: .up) } } label: {
+                                Image(systemName: "chevron.up")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(isUploadingImage || movingImageID != nil || deletingImageID != nil)
+
+                            Button { Task { await moveImage(image, direction: .down) } } label: {
+                                Image(systemName: "chevron.down")
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(isUploadingImage || movingImageID != nil || deletingImageID != nil)
+
+                            Button { Task { await deleteImage(image) } } label: {
+                                Image(systemName: "trash").foregroundStyle(.red)
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(isUploadingImage || movingImageID != nil)
+                        }
+                    }
+                }
+            }
+            let hasFront = images.contains { $0.image_type == .front_cover }
+            let hasBack  = images.contains { $0.image_type == .back_cover }
+            Picker("Tipo", selection: $selectedImageType) {
+                if !hasFront {
+                    Text("Portada").tag(ReleaseImageType.front_cover)
+                }
+                if !hasBack {
+                    Text("Contraportada").tag(ReleaseImageType.back_cover)
+                }
+                Text("Otra").tag(ReleaseImageType.other)
+            }
+            .onChange(of: hasFront) { _, _ in adjustImageType(hasFront: hasFront, hasBack: hasBack) }
+            .onChange(of: hasBack)  { _, _ in adjustImageType(hasFront: hasFront, hasBack: hasBack) }
+            PhotosPicker(selection: $photoPickerItem, matching: .images) {
+                Label(
+                    isUploadingImage ? "Subiendo…" : "Añadir imagen",
+                    systemImage: "photo.badge.plus"
+                )
+            }
+            .disabled(isUploadingImage)
+        }
+    }
+
+    // Si el tipo seleccionado ya no está disponible (porque se acaba de subir
+    // una portada o contraportada), cambia automáticamente a "Otra".
+    private func adjustImageType(hasFront: Bool, hasBack: Bool) {
+        if selectedImageType == .front_cover && hasFront { selectedImageType = .other }
+        if selectedImageType == .back_cover  && hasBack  { selectedImageType = .other }
+    }
+
+    private func imageTypeName(_ type: ReleaseImageType) -> String {
+        switch type {
+        case .front_cover: "Portada"
+        case .back_cover:  "Contraportada"
+        case .other:       "Otra"
+        }
+    }
+
+    private func uploadPhoto(_ item: PhotosPickerItem) async {
+        guard let edition else { return }
+        isUploadingImage = true
+        defer { isUploadingImage = false; photoPickerItem = nil }
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else { return }
+            guard let mimeType = Self.mimeType(for: data) else {
+                errorMessage = "Formato no soportado. Usa JPEG, PNG o WEBP."
+                return
+            }
+            let ext = Self.fileExtension(for: mimeType)
+            let newImage = try await store.uploadEditionImage(
+                releaseID: release.id, editionID: edition.id,
+                data: data, mimeType: mimeType,
+                filename: "image\(ext)", imageType: selectedImageType
+            )
+            images.append(newImage)
+        } catch let e as DiscographyError { errorMessage = message(for: e) }
+        catch { errorMessage = "No se pudo subir la imagen. Inténtalo de nuevo." }
+    }
+
+    private func moveImage(_ image: ReleaseImage, direction: Components.Schemas.ImageMoveRequest.directionPayload) async {
+        guard let edition else { return }
+        movingImageID = image.id
+        defer { movingImageID = nil }
+        do {
+            images = try await store.moveEditionImage(
+                releaseID: release.id, editionID: edition.id, imageID: image.id, direction: direction
+            )
+        } catch let e as DiscographyError { errorMessage = message(for: e) }
+        catch { errorMessage = "No se pudo mover la imagen. Inténtalo de nuevo." }
+    }
+
+    private func deleteImage(_ image: ReleaseImage) async {
+        guard let edition else { return }
+        deletingImageID = image.id
+        defer { deletingImageID = nil }
+        do {
+            try await store.deleteEditionImage(
+                releaseID: release.id, editionID: edition.id, imageID: image.id
+            )
+            images.removeAll { $0.id == image.id }
+        } catch let e as DiscographyError { errorMessage = message(for: e) }
+        catch { errorMessage = "No se pudo eliminar la imagen. Inténtalo de nuevo." }
+    }
+
+    private static func mimeType(for data: Data) -> String? {
+        let jpeg: [UInt8] = [0xFF, 0xD8, 0xFF]
+        let png:  [UInt8] = [0x89, 0x50, 0x4E, 0x47]
+        if data.starts(with: jpeg) { return "image/jpeg" }
+        if data.starts(with: png)  { return "image/png" }
+        if data.count >= 12,
+           data[data.startIndex..<data.startIndex + 4].elementsEqual(Array("RIFF".utf8)),
+           data[data.startIndex + 8..<data.startIndex + 12].elementsEqual(Array("WEBP".utf8)) {
+            return "image/webp"
+        }
+        return nil
+    }
+
+    private static func fileExtension(for mimeType: String) -> String {
+        switch mimeType {
+        case "image/jpeg": ".jpg"
+        case "image/png":  ".png"
+        case "image/webp": ".webp"
+        default: ""
         }
     }
 
