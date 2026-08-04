@@ -33,9 +33,11 @@ para esta app. Android queda para el futuro con otra base de código.
   Markdown, tracklist, imágenes con ↑↓ ordenación); badge de ediciones en portada; filtros
   multi-selección (tipo, año, sello, país) en la hoja de ediciones con banderas; selector
   de país con frecuentes y buscador (soporta "EU" — Unión Europea); detalle de lectura
-  completo: descripción del disco, créditos y notas de la edición (Markdown colapsable a
-  3 líneas con hoja modal), metadatos como tabla (País, Sello, Publicación con fecha
-  completa, Formato, Cat.), todos los campos opcionales — si no están informados no se muestran.
+  completo con secciones desplegables (chevron ∨/∧): descripción junto al título del disco,
+  créditos y notas de la edición, todo renderizado con WKWebView para Markdown real (títulos,
+  listas, negritas, etc.) y altura adaptada al contenido; metadatos como tabla (País, Sello,
+  Publicación con fecha completa, Formato, Cat.); botón de preview (👁) en el editor Markdown
+  para ver el resultado renderizado sin salir del formulario.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 

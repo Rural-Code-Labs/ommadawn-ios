@@ -86,6 +86,12 @@ struct ReleaseEditView: View {
             .sheet(isPresented: $showingCheatsheet) {
                 MarkdownCheatsheetView()
             }
+            .sheet(isPresented: Binding(
+                get: { markdownController.showingPreview },
+                set: { markdownController.showingPreview = $0 }
+            )) {
+                MarkdownPreviewSheet(title: markdownController.previewTitle, text: markdownController.previewText)
+            }
         }
     }
 

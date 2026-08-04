@@ -24,6 +24,10 @@ struct ReleaseDetailView: View {
     @State private var release: Release
     @State private var selectedEditionID: Int?
 
+    // Descripción desplegable junto al título
+    @State private var isDescExpanded = false
+    @State private var descHeight: CGFloat = 100
+
     // Estado del menú de Release
     @State private var showingEdit = false
     @State private var showingDeleteConfirm = false
@@ -75,12 +79,28 @@ struct ReleaseDetailView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 20) {
-                    Text(release.title)
-                        .font(.title2.bold())
-
                     if let desc = release.description, !desc.isEmpty {
-                        ExpandableMarkdownText(text: desc, sheetTitle: "Descripción")
-                            .font(.body)
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(release.title)
+                                .font(.title2.bold())
+                            Spacer()
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) { isDescExpanded.toggle() }
+                            } label: {
+                                Image(systemName: "chevron.down")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                                    .rotationEffect(.degrees(isDescExpanded ? 180 : 0))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        if isDescExpanded {
+                            DynamicMarkdownWebView(text: desc, contentHeight: $descHeight)
+                                .frame(height: descHeight)
+                        }
+                    } else {
+                        Text(release.title)
+                            .font(.title2.bold())
                     }
 
                     if release.editions.isEmpty {
@@ -97,11 +117,11 @@ struct ReleaseDetailView: View {
                             }
                             if let credits = edition.credits, !credits.isEmpty {
                                 Divider()
-                                MarkdownInfoSection(title: "Créditos", text: credits)
+                                CollapsibleMarkdownSection(title: "Créditos", text: credits)
                             }
                             if let notes = edition.notes, !notes.isEmpty {
                                 Divider()
-                                MarkdownInfoSection(title: "Notas", text: notes)
+                                CollapsibleMarkdownSection(title: "Notas", text: notes)
                             }
                         }
                     }
@@ -380,74 +400,53 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
     }
 }
 
-// MARK: - Texto Markdown colapsable (abre hoja modal)
+// MARK: - Parseo Markdown compartido
 
-private struct ExpandableMarkdownText: View {
-    let text: String
-    let sheetTitle: String
-    @State private var showingSheet = false
-
-    var body: some View {
-        let attributed = (try? AttributedString(markdown: text)) ?? AttributedString(text)
-
-        VStack(alignment: .leading, spacing: 6) {
-            Text(attributed)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button("Leer más") { showingSheet = true }
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(.tint)
-                .buttonStyle(.plain)
-        }
-        .sheet(isPresented: $showingSheet) {
-            MarkdownFullTextSheet(title: sheetTitle, text: text)
-        }
-    }
+/// Parsea Markdown con interpretación completa (títulos, listas, citas…).
+/// Convierte saltos de línea simples a dobles para que un Enter en el
+/// editor se refleje como salto de párrafo visible en la lectura.
+private func parseMarkdown(_ text: String) -> AttributedString {
+    let processed = text.replacingOccurrences(
+        of: "(?<!\n)\n(?!\n)",
+        with: "\n\n",
+        options: .regularExpression
+    )
+    let options = AttributedString.MarkdownParsingOptions(interpretedSyntax: .full)
+    return (try? AttributedString(markdown: processed, options: options)) ?? AttributedString(text)
 }
 
-// MARK: - Hoja con el texto completo
+// MARK: - Sección Markdown desplegable/colapsable
 
-private struct MarkdownFullTextSheet: View {
+private struct CollapsibleMarkdownSection: View {
     let title: String
     let text: String
-    @Environment(\.dismiss) private var dismiss
+    @State private var isExpanded = false
+    @State private var webViewHeight: CGFloat = 100
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                let attributed = (try? AttributedString(markdown: text)) ?? AttributedString(text)
-                Text(attributed)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                    }
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { isExpanded.toggle() }
+            } label: {
+                HStack {
+                    Text(title).font(.headline)
+                    Spacer()
+                    Image(systemName: "chevron.down")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isExpanded ? 180 : 0))
                 }
+                .foregroundStyle(.primary)
+                .contentShape(Rectangle())
+                .padding(.vertical, 4)
             }
-        }
-    }
-}
+            .buttonStyle(.plain)
 
-// MARK: - Sección de información Markdown con cabecera
-
-private struct MarkdownInfoSection: View {
-    let title: String
-    let text: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.headline)
-            ExpandableMarkdownText(text: text, sheetTitle: title)
-                .font(.body)
+            if isExpanded {
+                DynamicMarkdownWebView(text: text, contentHeight: $webViewHeight)
+                    .frame(height: webViewHeight)
+                    .padding(.top, 6)
+            }
         }
     }
 }

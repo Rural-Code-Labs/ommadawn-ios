@@ -116,6 +116,13 @@ struct EditionEditView: View {
             .navigationTitle(isEditing ? "Editar edición" : "Nueva edición")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingCheatsheet) { MarkdownCheatsheetView() }
+            .sheet(isPresented: Binding(
+                get: { creditsController.showingPreview || notesController.showingPreview },
+                set: { if !$0 { creditsController.showingPreview = false; notesController.showingPreview = false } }
+            )) {
+                let ctrl = creditsController.showingPreview ? creditsController : notesController
+                MarkdownPreviewSheet(title: ctrl.previewTitle, text: ctrl.previewText)
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { dismiss() }

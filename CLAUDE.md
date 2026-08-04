@@ -130,11 +130,14 @@ con otra base de código.
     openapi.json actualizado: `ReleaseRead/Create/Update` incluyen `description`.
   - **`EditionEditView`**: los campos `credits` y `notes` (antes `TextField`) usan ahora
     `MarkdownEditorSection`. Controladores independientes por campo; cheatsheet compartido.
-- **Detalle de lectura completo (4 ago 2026)**: `ReleaseDetailView` muestra ahora todos los campos de texto enriquecido y los metadatos de la edición que antes faltaban:
-  - **`description` del disco**: aparece bajo el título, colapsado a 3 líneas con botón "Leer más" que abre una hoja modal. La hoja tiene título de sección, `ScrollView` con el texto completo renderizado como Markdown (`AttributedString`) y botón ✕ en la esquina superior derecha.
+- **Detalle de lectura completo (4 ago 2026, rediseñado el mismo día)**:
+  - **`description` del disco**: sección desplegable junto al título — el chevron ∨/∧ aparece a la derecha del `Text` del título (en un `HStack`). Al expandir muestra el contenido completo renderizado con `DynamicMarkdownWebView` (altura adaptada al contenido vía JS `document.body.scrollHeight`). Si el disco no tiene descripción, el chevron no aparece.
   - **Metadatos de edición como tabla**: `editionMeta` usa un `Grid` con dos columnas (etiqueta secundaria / valor), mostrando País, Sello, Publicación (fecha completa localizada en español vía `DateFormatter`), Formato y Cat. Solo aparecen los campos informados.
-  - **`credits` y `notes` de la edición**: se muestran bajo el tracklist, cada uno con cabecera `headline` y el mismo patrón de colapso + hoja modal que la descripción.
+  - **`credits` y `notes` de la edición**: secciones desplegables con cabecera `headline` + chevron ∨/∧, mismo patrón collapsible. Sin resumen de 3 líneas: o se ve todo o no se ve nada. Renderizadas con `DynamicMarkdownWebView`.
   - Los campos ausentes (`nil` o vacíos) no se renderizan en ningún caso.
+- **Preview Markdown en el editor y renderizado compartido (4 ago 2026)**:
+  - **Botón de preview (👁)** en la toolbar de `MarkdownEditorSection`: al pulsarlo abre `MarkdownPreviewSheet` (WKWebView) con el contenido actual del campo. El estado de preview (`showingPreview`, `previewTitle`, `previewText`) vive en `MarkdownEditorController` (referencia estable en el padre) y el `.sheet` se ancla al `Form` del caller (`EditionEditView`, `ReleaseEditView`) — necesario porque un `.sheet` anclado a una celda de Form/List dentro de otra hoja puede ser reseteado por SwiftUI cuando el teclado se descarta y la jerarquía se recrea.
+  - **Código de renderizado Markdown centralizado en `MarkdownTextEditor.swift`**: `MarkdownWebView` (para hojas modales), `DynamicMarkdownWebView` (para incrustar en `ScrollView`, altura adaptada con `WKNavigationDelegate`), `MarkdownPreviewSheet` (hoja compartida con ✕), `markdownStyledHTML` (con padding 16px, para hojas), `markdownInlineHTML` (sin padding, para incrustar), `markdownToHTML` + `inlineMd` (conversor bloque/inline Markdown→HTML). `ReleaseDetailView` ya no duplica este código.
 
 ### Backlog de mejoras acordadas (Fase 4)
 
@@ -491,7 +494,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅, detalle de lectura completo (description + credits + notes + catalog_number + fecha completa) ✅ |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅, detalle de lectura completo con secciones desplegables y renderizado WKWebView ✅, botón de preview en editor Markdown ✅ |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |

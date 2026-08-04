@@ -4,6 +4,8 @@
 //
 //  UITextView envuelto para SwiftUI con un controlador que permite insertar
 //  y envolver texto con sintaxis Markdown desde botones externos a la vista.
+//  Incluye también el renderizador Markdown → HTML (WKWebView) compartido
+//  por el editor (botón ojo) y la vista de detalle (hoja "Leer más").
 //
 //  Uso habitual:
 //    MarkdownEditorSection("Descripción", text: $desc, controller: ctrl) {
@@ -13,6 +15,7 @@
 
 import SwiftUI
 import UIKit
+import WebKit
 
 // MARK: - Controlador
 
@@ -22,6 +25,9 @@ import UIKit
 @Observable @MainActor
 final class MarkdownEditorController {
     weak var textView: UITextView?
+    var showingPreview = false
+    var previewTitle: String = ""
+    var previewText: String = ""
 
     /// Envuelve el texto seleccionado (o inserta marcadores vacíos con el cursor
     /// entre ellos si no hay selección) con el marcador dado.
@@ -149,6 +155,15 @@ struct MarkdownEditorSection: View {
 
             Spacer()
 
+            toolbarButton(action: {
+                controller.previewTitle = title
+                controller.previewText = text
+                controller.showingPreview = true
+            }) {
+                Image(systemName: "eye")
+            }
+            .foregroundStyle(.secondary)
+
             Button(action: onCheatsheet) {
                 Image(systemName: "questionmark.circle")
                     .frame(width: 32, height: 32)
@@ -167,4 +182,212 @@ struct MarkdownEditorSection: View {
         }
         .buttonStyle(.borderless)
     }
+}
+
+// MARK: - Hoja de preview Markdown (compartida con ReleaseDetailView)
+
+struct MarkdownPreviewSheet: View {
+    let title: String
+    let text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            MarkdownWebView(text: text)
+                .navigationTitle(title)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title3)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+        }
+    }
+}
+
+// MARK: - WKWebView con altura dinámica (para incrustar en ScrollView)
+
+struct DynamicMarkdownWebView: UIViewRepresentable {
+    let text: String
+    @Binding var contentHeight: CGFloat
+
+    func makeCoordinator() -> Coordinator { Coordinator(contentHeight: $contentHeight) }
+
+    func makeUIView(context: Context) -> WKWebView {
+        let wv = WKWebView()
+        wv.isOpaque = false
+        wv.backgroundColor = .clear
+        wv.scrollView.backgroundColor = .clear
+        wv.scrollView.isScrollEnabled = false
+        wv.navigationDelegate = context.coordinator
+        return wv
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        uiView.loadHTMLString(markdownInlineHTML(text), baseURL: nil)
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        @Binding var contentHeight: CGFloat
+        init(contentHeight: Binding<CGFloat>) { _contentHeight = contentHeight }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            webView.evaluateJavaScript("document.body.scrollHeight") { result, _ in
+                DispatchQueue.main.async {
+                    if let h = result as? CGFloat        { self.contentHeight = h }
+                    else if let h = result as? Double    { self.contentHeight = CGFloat(h) }
+                    else if let h = result as? Int       { self.contentHeight = CGFloat(h) }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - WKWebView para Markdown
+
+struct MarkdownWebView: UIViewRepresentable {
+    let text: String
+
+    func makeUIView(context: Context) -> WKWebView {
+        let wv = WKWebView()
+        wv.isOpaque = false
+        wv.backgroundColor = .clear
+        wv.scrollView.backgroundColor = .clear
+        return wv
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        uiView.loadHTMLString(markdownStyledHTML(text), baseURL: nil)
+    }
+}
+
+// MARK: - Conversor Markdown → HTML
+
+func markdownStyledHTML(_ markdown: String) -> String {
+    """
+    <!DOCTYPE html><html><head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+    :root { color-scheme: light dark; }
+    body {
+        font-family: -apple-system, sans-serif; font-size: 17px;
+        color: #000; background: transparent;
+        margin: 0; padding: 16px; line-height: 1.6;
+        -webkit-text-size-adjust: 100%;
+    }
+    @media (prefers-color-scheme: dark) { body { color: #fff; } }
+    h1 { font-size: 26px; font-weight: 700; margin: 4px 0 10px; }
+    h2 { font-size: 20px; font-weight: 700; margin: 18px 0 8px; }
+    h3 { font-size: 17px; font-weight: 600; margin: 14px 0 6px; }
+    p  { margin: 0 0 10px; }
+    ul, ol { padding-left: 20px; margin: 0 0 10px; }
+    li { margin-bottom: 4px; }
+    blockquote { border-left: 3px solid rgba(128,128,128,0.5); margin: 0 0 10px; padding: 2px 12px; opacity: 0.8; }
+    code { font-family: monospace; font-size: 14px; background: rgba(128,128,128,0.15); padding: 1px 4px; border-radius: 3px; }
+    strong { font-weight: 700; }
+    em { font-style: italic; }
+    a { color: #007AFF; }
+    hr { border: none; border-top: 1px solid rgba(128,128,128,0.3); margin: 14px 0; }
+    </style></head>
+    <body>\(markdownToHTML(markdown))</body></html>
+    """
+}
+
+func markdownInlineHTML(_ markdown: String) -> String {
+    """
+    <!DOCTYPE html><html><head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <style>
+    :root { color-scheme: light dark; }
+    body {
+        font-family: -apple-system, sans-serif; font-size: 17px;
+        color: #000; background: transparent;
+        margin: 0; padding: 0; line-height: 1.6;
+        -webkit-text-size-adjust: 100%;
+    }
+    @media (prefers-color-scheme: dark) { body { color: #fff; } }
+    h1 { font-size: 22px; font-weight: 700; margin: 0 0 8px; }
+    h2 { font-size: 18px; font-weight: 700; margin: 14px 0 6px; }
+    h3 { font-size: 16px; font-weight: 600; margin: 10px 0 4px; }
+    p  { margin: 0 0 8px; }
+    ul, ol { padding-left: 20px; margin: 0 0 8px; }
+    li { margin-bottom: 3px; }
+    blockquote { border-left: 3px solid rgba(128,128,128,0.5); margin: 0 0 8px; padding: 2px 10px; opacity: 0.8; }
+    code { font-family: monospace; font-size: 14px; background: rgba(128,128,128,0.15); padding: 1px 4px; border-radius: 3px; }
+    strong { font-weight: 700; }
+    em { font-style: italic; }
+    a { color: #007AFF; }
+    hr { border: none; border-top: 1px solid rgba(128,128,128,0.3); margin: 10px 0; }
+    </style></head>
+    <body>\(markdownToHTML(markdown))</body></html>
+    """
+}
+
+func markdownToHTML(_ text: String) -> String {
+    var html = ""
+    let lines = text.components(separatedBy: "\n")
+    var inParagraph = false
+    var inUL = false
+    var inOL = false
+    var inBlockquote = false
+
+    func closeParagraph()  { if inParagraph  { html += "</p>";          inParagraph  = false } }
+    func closeUL()         { if inUL         { html += "</ul>";         inUL         = false } }
+    func closeOL()         { if inOL         { html += "</ol>";         inOL         = false } }
+    func closeBlockquote() { if inBlockquote { html += "</blockquote>"; inBlockquote = false } }
+    func closeAll() { closeParagraph(); closeUL(); closeOL(); closeBlockquote() }
+
+    for line in lines {
+        if line.hasPrefix("### ") {
+            closeAll()
+            html += "<h3>\(inlineMd(String(line.dropFirst(4))))</h3>"
+        } else if line.hasPrefix("## ") {
+            closeAll()
+            html += "<h2>\(inlineMd(String(line.dropFirst(3))))</h2>"
+        } else if line.hasPrefix("# ") {
+            closeAll()
+            html += "<h1>\(inlineMd(String(line.dropFirst(2))))</h1>"
+        } else if line == "---" || line == "***" || line == "___" {
+            closeAll()
+            html += "<hr>"
+        } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
+            closeParagraph(); closeOL(); closeBlockquote()
+            if !inUL { html += "<ul>"; inUL = true }
+            html += "<li>\(inlineMd(String(line.dropFirst(2))))</li>"
+        } else if let r = line.range(of: #"^\d+\. "#, options: .regularExpression) {
+            closeParagraph(); closeUL(); closeBlockquote()
+            if !inOL { html += "<ol>"; inOL = true }
+            html += "<li>\(inlineMd(String(line[r.upperBound...])))</li>"
+        } else if line.hasPrefix("> ") {
+            closeParagraph(); closeUL(); closeOL()
+            if !inBlockquote { html += "<blockquote>"; inBlockquote = true } else { html += "<br>" }
+            html += inlineMd(String(line.dropFirst(2)))
+        } else if line.trimmingCharacters(in: .whitespaces).isEmpty {
+            closeAll()
+        } else {
+            closeUL(); closeOL(); closeBlockquote()
+            if !inParagraph { html += "<p>"; inParagraph = true } else { html += "<br>" }
+            html += inlineMd(line)
+        }
+    }
+    closeAll()
+    return html
+}
+
+func inlineMd(_ raw: String) -> String {
+    var s = raw
+    s = s.replacingOccurrences(of: "&", with: "&amp;")
+    s = s.replacingOccurrences(of: "<", with: "&lt;")
+    s = s.replacingOccurrences(of: ">", with: "&gt;")
+    s = s.replacingOccurrences(of: #"\*\*(.+?)\*\*"#, with: "<strong>$1</strong>", options: .regularExpression)
+    s = s.replacingOccurrences(of: #"__(.+?)__"#,     with: "<strong>$1</strong>", options: .regularExpression)
+    s = s.replacingOccurrences(of: #"(?<![*])\*([^*\n]+?)\*(?![*])"#, with: "<em>$1</em>", options: .regularExpression)
+    s = s.replacingOccurrences(of: #"(?<!_)_([^_\n]+?)_(?!_)"#,       with: "<em>$1</em>", options: .regularExpression)
+    s = s.replacingOccurrences(of: #"`([^`]+)`"#,                      with: "<code>$1</code>", options: .regularExpression)
+    s = s.replacingOccurrences(of: #"\[([^\]]+)\]\(([^)]+)\)"#,        with: "<a href=\"$2\">$1</a>", options: .regularExpression)
+    return s
 }
