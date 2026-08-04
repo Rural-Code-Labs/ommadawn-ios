@@ -139,30 +139,34 @@ con otra base de código.
   - **Botón de preview (👁)** en la toolbar de `MarkdownEditorSection`: al pulsarlo abre `MarkdownPreviewSheet` (WKWebView) con el contenido actual del campo. El estado de preview (`showingPreview`, `previewTitle`, `previewText`) vive en `MarkdownEditorController` (referencia estable en el padre) y el `.sheet` se ancla al `Form` del caller (`EditionEditView`, `ReleaseEditView`) — necesario porque un `.sheet` anclado a una celda de Form/List dentro de otra hoja puede ser reseteado por SwiftUI cuando el teclado se descarta y la jerarquía se recrea.
   - **Código de renderizado Markdown centralizado en `MarkdownTextEditor.swift`**: `MarkdownWebView` (para hojas modales), `DynamicMarkdownWebView` (para incrustar en `ScrollView`, altura adaptada con `WKNavigationDelegate`), `MarkdownPreviewSheet` (hoja compartida con ✕), `markdownStyledHTML` (con padding 16px, para hojas), `markdownInlineHTML` (sin padding, para incrustar), `markdownToHTML` + `inlineMd` (conversor bloque/inline Markdown→HTML). `ReleaseDetailView` ya no duplica este código.
 
-### Backlog de mejoras acordadas (Fase 4)
+### Backlog — Fase 4 (activa)
 
 Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 
 | # | Mejora | Requiere API |
 |---|---|---|
-| 6 | **Nombre de edición en el detalle**: mostrar el `edition_name` de la edición activa junto (o bajo) el título del disco cuando está informado — p.ej. "Tubular Bells · Deluxe Edition". Ahora solo se ve el título del release. | 🟢 Solo app |
-| 7 | **Créditos por pista**: cada track puede tener sus propios créditos (ej. "Guitarra: Mike Oldfield"). Requiere nuevo campo en el modelo de track de la API y UI en `EditionEditView` para editarlos y en `ReleaseDetailView` para mostrarlos. | 🔴 API: campo `credits: String?` en `Track`, incluido en el contrato |
-| 1 | **Rediseño de vista de discografía**: portada completa en detalle (ocupa más espacio, ediciones en hoja o sección expandible), galería con primera foto grande y resto en miniaturas. ~~Países con bandera~~: ✅ hecho (2 ago 2026). | 🟢 Solo app |
-| 2 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. Necesita un endpoint de sellos en la API. | 🔴 API: endpoint `/labels` (listado + creación) |
-| 5 | ~~**Ordenar imágenes "Otras" de una edición**~~: ✅ hecho (4 ago 2026) — botones ↑↓ en `EditionEditView`, API con `position` + `PATCH .../images/{id}/position`. | ✅ |
-| 3 | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios; un admin los aprueba/rechaza. Necesita modelo de contribuciones en la API y pantalla de revisión en la app. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
-| 4 | **Colección personal**: cada usuario puede marcar qué ediciones tiene en su colección con el estado del disco y la funda (p. ej. Mint / Near Mint / Very Good+ / Very Good / Good / Fair / Poor — escala Discogs). Implica una vista de colección propia y un botón en el detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas opcionales), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
-| 8 | **Colecciones de ediciones** *(idea a largo plazo)*: agrupar varias ediciones bajo un nombre de colección (p. ej. "Deluxe Edition Box Set" agrupa la edición original + el bonus disc + el DVD). Una colección es una lista ordenada de ediciones con nombre propio. Útil para cajas y ediciones multi-disco. | 🔴 API: modelo `EditionCollection` (name, ordered list of edition IDs), endpoints CRUD |
+| ~~4.1~~ | ~~**Rediseño de vista de discografía**~~: portada grande, galería, secciones desplegables, banderas de país. ✅ hecho (ago 2026). | ✅ |
+| 4.2 | **Nombre de edición en el detalle**: mostrar `edition_name` junto al título del disco cuando está informado — p.ej. "Tubular Bells · Deluxe Edition". Ahora solo se ve el título del release. | 🟢 Solo app |
+| 4.3 | **Créditos por pista**: cada track puede tener sus propios créditos (ej. "Guitarra: Mike Oldfield"). UI en `EditionEditView` para editarlos y en `ReleaseDetailView` para mostrarlos. | 🔴 API: campo `credits: String?` en `Track` |
+| 4.4 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. | 🔴 API: endpoint `/labels` (listado + creación) |
 
-### Backlog de mejoras de autenticación
+### Backlog — Fase 5: Mejoras de autenticación
 
 | # | Mejora | Requiere API |
 |---|---|---|
-| A1 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
-| A2 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — el usuario pide el enlace, recibe un correo con un token de un solo uso y establece una nueva contraseña. | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email en el servidor |
-| A3 | **Verificación de correo**: al registrarse, el usuario recibe un email de confirmación; la cuenta queda pendiente hasta que verifica. | 🔴 API: campo `email_verified` en el usuario, `POST /auth/verify-email/request` + `POST /auth/verify-email/confirm`; requiere servicio de email |
+| 5.1 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
+| 5.2 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
+| 5.3 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
 
-> A2 y A3 comparten infraestructura de email en la API (proveedor SMTP o servicio transaccional). Tiene sentido implementarlas juntas en el lado del servidor.
+> 5.2 y 5.3 comparten infraestructura de email (proveedor SMTP o servicio transaccional). Tiene sentido implementarlas juntas en el servidor.
+
+### Backlog — Fases futuras
+
+| Fase | Contenido | Requiere API |
+|---|---|---|
+| **6** | **Colecciones de ediciones**: agrupar ediciones bajo un nombre (ej. "Deluxe Box Set" = edición original + bonus disc + DVD). Lista ordenada de ediciones con nombre propio. Útil para cajas y ediciones multi-disco. | 🔴 API: modelo `EditionCollection` (name, ordered edition IDs), endpoints CRUD |
+| **7** | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios al catálogo; un admin los aprueba/rechaza. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
+| **8** | **Colección personal**: cada usuario marca qué ediciones tiene, con estado del disco y la funda (escala Discogs: Mint / NM / VG+ / VG / G / F / P). Vista de colección propia + botón en detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
 
 ---
 
@@ -497,7 +501,11 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅, detalle de lectura completo con secciones desplegables y renderizado WKWebView ✅, botón de preview en editor Markdown ✅ |
-| **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
-| **6 — Libros** | Bibliografía. | Pendiente |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅, detalle de lectura completo con secciones desplegables y renderizado WKWebView ✅, botón de preview en editor Markdown ✅. Pendiente: 4.2 nombre de edición, 4.3 créditos por pista, 4.4 sello seleccionable. |
+| **5 — Mejoras de autenticación** | Cambio de contraseña, recuperación por email y verificación de correo al registrarse. | Pendiente |
+| **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
+| **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
+| **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
+| **9 — Conciertos** | Giras, fechas, setlists. | Pendiente |
+| **10 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |
