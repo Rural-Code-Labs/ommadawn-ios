@@ -130,7 +130,11 @@ con otra base de código.
     openapi.json actualizado: `ReleaseRead/Create/Update` incluyen `description`.
   - **`EditionEditView`**: los campos `credits` y `notes` (antes `TextField`) usan ahora
     `MarkdownEditorSection`. Controladores independientes por campo; cheatsheet compartido.
-- **Pendiente para cerrar Fase 4**: mostrar `description` del disco y `credits`/`notes`/`catalog_number` de la edición en las vistas de detalle de lectura.
+- **Detalle de lectura completo (4 ago 2026)**: `ReleaseDetailView` muestra ahora todos los campos de texto enriquecido y los metadatos de la edición que antes faltaban:
+  - **`description` del disco**: aparece bajo el título, colapsado a 3 líneas con botón "Leer más" que abre una hoja modal. La hoja tiene título de sección, `ScrollView` con el texto completo renderizado como Markdown (`AttributedString`) y botón ✕ en la esquina superior derecha.
+  - **Metadatos de edición como tabla**: `editionMeta` usa un `Grid` con dos columnas (etiqueta secundaria / valor), mostrando País, Sello, Publicación (fecha completa localizada en español vía `DateFormatter`), Formato y Cat. Solo aparecen los campos informados.
+  - **`credits` y `notes` de la edición**: se muestran bajo el tracklist, cada uno con cabecera `headline` y el mismo patrón de colapso + hoja modal que la descripción.
+  - Los campos ausentes (`nil` o vacíos) no se renderizan en ningún caso.
 
 ### Backlog de mejoras acordadas (Fase 4)
 
@@ -487,7 +491,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅; pendiente: revisar y pulir UX |
+| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅, detalle de lectura completo (description + credits + notes + catalog_number + fecha completa) ✅ |
 | **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
 | **6 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |

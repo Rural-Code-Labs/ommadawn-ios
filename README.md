@@ -32,8 +32,10 @@ para esta app. Android queda para el futuro con otra base de código.
   del catálogo para admins (disco con descripción Markdown, edición con créditos y notas
   Markdown, tracklist, imágenes con ↑↓ ordenación); badge de ediciones en portada; filtros
   multi-selección (tipo, año, sello, país) en la hoja de ediciones con banderas; selector
-  de país con frecuentes y buscador (soporta "EU" — Unión Europea). Pendiente: mostrar
-  los campos de texto enriquecido en las vistas de lectura.
+  de país con frecuentes y buscador (soporta "EU" — Unión Europea); detalle de lectura
+  completo: descripción del disco, créditos y notas de la edición (Markdown colapsable a
+  3 líneas con hoja modal), metadatos como tabla (País, Sello, Publicación con fecha
+  completa, Formato, Cat.), todos los campos opcionales — si no están informados no se muestran.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 

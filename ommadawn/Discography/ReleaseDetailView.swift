@@ -78,6 +78,11 @@ struct ReleaseDetailView: View {
                     Text(release.title)
                         .font(.title2.bold())
 
+                    if let desc = release.description, !desc.isEmpty {
+                        ExpandableMarkdownText(text: desc, sheetTitle: "Descripción")
+                            .font(.body)
+                    }
+
                     if release.editions.isEmpty {
                         ContentUnavailableView(
                             "Sin ediciones todavía",
@@ -89,6 +94,14 @@ struct ReleaseDetailView: View {
                             editionMeta(edition)
                             if !edition.tracks.isEmpty {
                                 tracklist(edition.tracks)
+                            }
+                            if let credits = edition.credits, !credits.isEmpty {
+                                Divider()
+                                MarkdownInfoSection(title: "Créditos", text: credits)
+                            }
+                            if let notes = edition.notes, !notes.isEmpty {
+                                Divider()
+                                MarkdownInfoSection(title: "Notas", text: notes)
                             }
                         }
                     }
@@ -264,14 +277,41 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
     }
 
     private func editionMeta(_ edition: Edition) -> some View {
-        HStack(spacing: 6) {
-            if let c = Country.find(edition.country) { Text(c.displayName) }
-            else if let raw = edition.country { Text(raw) }
-            if let label = edition.label { Text("·"); Text(label) }
-            if let year = edition.release_date?.prefix(4) { Text("·"); Text(year) }
+        Grid(alignment: .leadingFirstTextBaseline, horizontalSpacing: 10, verticalSpacing: 4) {
+            if let country = edition.country {
+                GridRow {
+                    Text("País")
+                        .foregroundStyle(.secondary)
+                        .gridColumnAlignment(.leading)
+                    Text(Country.find(country)?.displayName ?? country)
+                }
+            }
+            if let label = edition.label, !label.isEmpty {
+                GridRow {
+                    Text("Sello").foregroundStyle(.secondary)
+                    Text(label)
+                }
+            }
+            if let dateStr = edition.release_date {
+                GridRow {
+                    Text("Publicación").foregroundStyle(.secondary)
+                    Text(formattedDate(dateStr))
+                }
+            }
+            if let format = edition.format {
+                GridRow {
+                    Text("Formato").foregroundStyle(.secondary)
+                    Text(format.displayName)
+                }
+            }
+            if let cat = edition.catalog_number, !cat.isEmpty {
+                GridRow {
+                    Text("Cat.").foregroundStyle(.secondary)
+                    Text(cat)
+                }
+            }
         }
         .font(.subheadline)
-        .foregroundStyle(.secondary)
     }
 
     private func tracklist(_ tracks: [Track]) -> some View {
@@ -305,6 +345,16 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
         return URL(string: cover.url)
     }
 
+    private func formattedDate(_ string: String) -> String {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "es")
+        df.dateFormat = "yyyy-MM-dd"
+        guard let date = df.date(from: string) else { return string }
+        df.dateStyle = .long
+        df.timeStyle = .none
+        return df.string(from: date)
+    }
+
     private func deleteRelease() async {
         isDeleting = true
         defer { isDeleting = false }
@@ -326,6 +376,78 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
         release = fresh
         if selectedEditionID == nil || !release.editions.contains(where: { $0.id == selectedEditionID }) {
             selectedEditionID = release.displayEdition?.id
+        }
+    }
+}
+
+// MARK: - Texto Markdown colapsable (abre hoja modal)
+
+private struct ExpandableMarkdownText: View {
+    let text: String
+    let sheetTitle: String
+    @State private var showingSheet = false
+
+    var body: some View {
+        let attributed = (try? AttributedString(markdown: text)) ?? AttributedString(text)
+
+        VStack(alignment: .leading, spacing: 6) {
+            Text(attributed)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button("Leer más") { showingSheet = true }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+                .buttonStyle(.plain)
+        }
+        .sheet(isPresented: $showingSheet) {
+            MarkdownFullTextSheet(title: sheetTitle, text: text)
+        }
+    }
+}
+
+// MARK: - Hoja con el texto completo
+
+private struct MarkdownFullTextSheet: View {
+    let title: String
+    let text: String
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                let attributed = (try? AttributedString(markdown: text)) ?? AttributedString(text)
+                Text(attributed)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+            }
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Sección de información Markdown con cabecera
+
+private struct MarkdownInfoSection: View {
+    let title: String
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(title)
+                .font(.headline)
+            ExpandableMarkdownText(text: text, sheetTitle: title)
+                .font(.body)
         }
     }
 }
