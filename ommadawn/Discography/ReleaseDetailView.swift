@@ -58,19 +58,11 @@ struct ReleaseDetailView: View {
     }
 
     private var sortedEditionImages: [ReleaseImage] {
-        editionImages.sorted { imageTypeOrder($0) < imageTypeOrder($1) }
+        editionImages.sorted { $0.position < $1.position }
     }
 
     private var editionImageURLs: [URL] {
         sortedEditionImages.compactMap { URL(string: $0.url) }
-    }
-
-    private func imageTypeOrder(_ img: ReleaseImage) -> Int {
-        switch img.image_type {
-        case .front_cover: return 0
-        case .back_cover: return 1
-        case .other: return 2
-        }
     }
 
     var body: some View {

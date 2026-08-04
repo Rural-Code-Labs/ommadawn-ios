@@ -116,10 +116,10 @@ struct DiscographyStore {
     // MARK: - Escritura (require_admin)
 
     /// Crea una obra nueva en el catálogo.
-    func createRelease(title: String, type: ReleaseType) async throws -> Release {
+    func createRelease(title: String, type: ReleaseType, description: String? = nil) async throws -> Release {
         do {
             let output = try await client.create_release_api_v1_discography_releases_post(
-                .init(body: .json(.init(title: title, release_type: type)))
+                .init(body: .json(.init(title: title, release_type: type, description: description)))
             )
             switch output {
             case .created(let created): return try created.body.json
@@ -132,11 +132,11 @@ struct DiscographyStore {
         catch { throw DiscographyError.network(error) }
     }
 
-    /// Actualiza título y/o tipo de una obra existente.
-    func updateRelease(id: Int, title: String, type: ReleaseType) async throws -> Release {
+    /// Actualiza título, tipo y/o descripción de una obra existente.
+    func updateRelease(id: Int, title: String, type: ReleaseType, description: String? = nil) async throws -> Release {
         do {
             let output = try await client.update_release_api_v1_discography_releases__release_id__patch(
-                .init(path: .init(release_id: id), body: .json(.init(title: title, release_type: type)))
+                .init(path: .init(release_id: id), body: .json(.init(title: title, release_type: type, description: description)))
             )
             switch output {
             case .ok(let ok): return try ok.body.json

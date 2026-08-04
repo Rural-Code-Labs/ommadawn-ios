@@ -114,7 +114,23 @@ con otra base de código.
     Llaman a `PATCH .../images/{id}/position` (`ImageMoveRequest { direction: "up"|"down" }`),
     que devuelve el array completo ya ordenado (`[ImageRead]`); `DiscographyStore.moveEditionImage`
     devuelve `[ReleaseImage]`. Las imágenes se muestran ordenadas por `position`.
-- **Pendiente para cerrar Fase 4**: revisar y pulir UX (bugs, detalles de diseño) a decidir con el usuario.
+- **Editor Markdown reutilizable (4 ago 2026)**:
+  - **`Shared/MarkdownTextEditor.swift`**: `UITextView` envuelto en `UIViewRepresentable` +
+    `MarkdownEditorController` (`@Observable @MainActor`) que mantiene referencia débil al
+    `UITextView` y expone `wrapSelection(with:)`, `insertLink()`, `insertListItem()` y
+    `insertBlockquote()`. El controlador se crea con `@State` en la vista padre (no
+    `@StateObject` — `@Observable` ya gestiona la identidad estable).
+  - **`Shared/MarkdownEditorSection`**: `Section` de SwiftUI lista para usar en un `Form`.
+    Toolbar con 5 botones: **N** (negrita `**`), *C* (cursiva `_`), enlace (`[texto](url)`),
+    lista (`- `), cita (`> `), más `?` para abrir el cheatsheet.
+  - **`Shared/MarkdownCheatsheetView.swift`**: hoja de referencia rápida con la sintaxis
+    Markdown más común (negrita, cursiva, enlace, títulos, lista, cita, código, separador).
+  - **`ReleaseEditView`**: gana sección "Descripción" con `MarkdownEditorSection` (altura 220pt).
+    `DiscographyStore.createRelease/updateRelease` pasan `description: String?`.
+    openapi.json actualizado: `ReleaseRead/Create/Update` incluyen `description`.
+  - **`EditionEditView`**: los campos `credits` y `notes` (antes `TextField`) usan ahora
+    `MarkdownEditorSection`. Controladores independientes por campo; cheatsheet compartido.
+- **Pendiente para cerrar Fase 4**: mostrar `description` del disco y `credits`/`notes`/`catalog_number` de la edición en las vistas de detalle de lectura.
 
 ### Backlog de mejoras acordadas (Fase 4)
 
@@ -354,7 +370,9 @@ ommadawn/
 │   │   └── Release+Presentation.swift
 │   ├── Shared/                   # Componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + NSLocale.isoCountryCodes + extraCodes
-│   │   └── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
+│   │   ├── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
+│   │   ├── MarkdownTextEditor.swift   # UITextView + MarkdownEditorController + MarkdownEditorSection
+│   │   └── MarkdownCheatsheetView.swift # referencia rápida de sintaxis Markdown
 │   ├── Design/
 │   │   ├── BrandMark.swift      # el logo "O" en Didot Italic como vista reutilizable
 │   │   ├── AppTheme.swift       # AppTheme + extensión apiValue/init(from:) para sincronizar con API

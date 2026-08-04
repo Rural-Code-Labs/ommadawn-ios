@@ -48,6 +48,11 @@ struct EditionEditView: View {
     @State private var deletingImageID: Int?
     @State private var movingImageID: Int?
 
+    // MARK: - Editores Markdown
+    @State private var creditsController = MarkdownEditorController()
+    @State private var notesController   = MarkdownEditorController()
+    @State private var showingCheatsheet = false
+
     // MARK: - Estado de UI
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -88,7 +93,18 @@ struct EditionEditView: View {
         NavigationStack {
             Form {
                 metadataSection
-                detailsSection
+                MarkdownEditorSection(
+                    "Créditos",
+                    text: $credits,
+                    controller: creditsController,
+                    onCheatsheet: { showingCheatsheet = true }
+                )
+                MarkdownEditorSection(
+                    "Notas",
+                    text: $notes,
+                    controller: notesController,
+                    onCheatsheet: { showingCheatsheet = true }
+                )
                 tracklistSection
                 if isEditing { imagesSection }
                 if let errorMessage {
@@ -99,6 +115,7 @@ struct EditionEditView: View {
             }
             .navigationTitle(isEditing ? "Editar edición" : "Nueva edición")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(isPresented: $showingCheatsheet) { MarkdownCheatsheetView() }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { dismiss() }
@@ -168,21 +185,6 @@ struct EditionEditView: View {
         }
     }
 
-    private var detailsSection: some View {
-        Section("Detalles") {
-            LabeledContent("Créditos") {
-                TextField("", text: $credits, axis: .vertical)
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(3...)
-            }
-            LabeledContent("Notas") {
-                TextField("", text: $notes, axis: .vertical)
-                    .multilineTextAlignment(.trailing)
-                    .lineLimit(3...)
-            }
-        }
-    }
-
     private var tracklistSection: some View {
         Section("Temas") {
             ForEach($tracks) { $track in
@@ -201,71 +203,79 @@ struct EditionEditView: View {
     // MARK: - Imágenes
 
     private var imagesSection: some View {
-        Section("Imágenes") {
-            if images.isEmpty {
-                Text("Sin imágenes todavía")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(images.sorted { $0.position < $1.position }, id: \.id) { image in
-                    HStack(spacing: 12) {
-                        AsyncImage(url: URL(string: image.url)) { img in
-                            img.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color.secondary.opacity(0.2)
-                        }
-                        .frame(width: 48, height: 48)
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(imageTypeName(image.image_type)).font(.body)
-                            Text(image.url.components(separatedBy: "/").last ?? "")
-                                .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                        }
-                        Spacer()
-                        if movingImageID == image.id || deletingImageID == image.id {
-                            ProgressView()
-                        } else {
-                            Button { Task { await moveImage(image, direction: .up) } } label: {
-                                Image(systemName: "chevron.up")
+        let sorted   = images.sorted { $0.position < $1.position }
+        let hasFront = images.contains { $0.image_type == .front_cover }
+        let hasBack  = images.contains { $0.image_type == .back_cover }
+        return Group {
+            Section("Imágenes") {
+                if sorted.isEmpty {
+                    Text("Sin imágenes todavía")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(Array(sorted.enumerated()), id: \.element.id) { index, image in
+                        HStack(spacing: 12) {
+                            AsyncImage(url: URL(string: image.url)) { img in
+                                img.resizable().aspectRatio(contentMode: .fill)
+                            } placeholder: {
+                                Color.secondary.opacity(0.2)
                             }
-                            .buttonStyle(.borderless)
-                            .disabled(isUploadingImage || movingImageID != nil || deletingImageID != nil)
+                            .frame(width: 48, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
 
-                            Button { Task { await moveImage(image, direction: .down) } } label: {
-                                Image(systemName: "chevron.down")
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(imageTypeName(image.image_type)).font(.body)
+                                Text(image.url.components(separatedBy: "/").last ?? "")
+                                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             }
-                            .buttonStyle(.borderless)
-                            .disabled(isUploadingImage || movingImageID != nil || deletingImageID != nil)
-
-                            Button { Task { await deleteImage(image) } } label: {
-                                Image(systemName: "trash").foregroundStyle(.red)
+                            Spacer()
+                            if movingImageID == image.id || deletingImageID == image.id {
+                                ProgressView()
+                            } else {
+                                if index > 0 {
+                                    Button { Task { await moveImage(image, direction: .up) } } label: {
+                                        Image(systemName: "chevron.up")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(isUploadingImage || movingImageID != nil || deletingImageID != nil)
+                                }
+                                if index < sorted.count - 1 {
+                                    Button { Task { await moveImage(image, direction: .down) } } label: {
+                                        Image(systemName: "chevron.down")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .disabled(isUploadingImage || movingImageID != nil || deletingImageID != nil)
+                                }
+                                Button { Task { await deleteImage(image) } } label: {
+                                    Image(systemName: "trash").foregroundStyle(.red)
+                                }
+                                .buttonStyle(.borderless)
+                                .disabled(isUploadingImage || movingImageID != nil)
                             }
-                            .buttonStyle(.borderless)
-                            .disabled(isUploadingImage || movingImageID != nil)
                         }
                     }
                 }
             }
-            let hasFront = images.contains { $0.image_type == .front_cover }
-            let hasBack  = images.contains { $0.image_type == .back_cover }
-            Picker("Tipo", selection: $selectedImageType) {
-                if !hasFront {
-                    Text("Portada").tag(ReleaseImageType.front_cover)
+
+            Section("Añadir imagen") {
+                Picker("Tipo", selection: $selectedImageType) {
+                    if !hasFront {
+                        Text("Portada").tag(ReleaseImageType.front_cover)
+                    }
+                    if !hasBack {
+                        Text("Contraportada").tag(ReleaseImageType.back_cover)
+                    }
+                    Text("Otra").tag(ReleaseImageType.other)
                 }
-                if !hasBack {
-                    Text("Contraportada").tag(ReleaseImageType.back_cover)
+                .onChange(of: hasFront) { _, _ in adjustImageType(hasFront: hasFront, hasBack: hasBack) }
+                .onChange(of: hasBack)  { _, _ in adjustImageType(hasFront: hasFront, hasBack: hasBack) }
+                PhotosPicker(selection: $photoPickerItem, matching: .images) {
+                    Label(
+                        isUploadingImage ? "Subiendo…" : "Subir imagen",
+                        systemImage: "photo.badge.plus"
+                    )
                 }
-                Text("Otra").tag(ReleaseImageType.other)
+                .disabled(isUploadingImage)
             }
-            .onChange(of: hasFront) { _, _ in adjustImageType(hasFront: hasFront, hasBack: hasBack) }
-            .onChange(of: hasBack)  { _, _ in adjustImageType(hasFront: hasFront, hasBack: hasBack) }
-            PhotosPicker(selection: $photoPickerItem, matching: .images) {
-                Label(
-                    isUploadingImage ? "Subiendo…" : "Añadir imagen",
-                    systemImage: "photo.badge.plus"
-                )
-            }
-            .disabled(isUploadingImage)
         }
     }
 

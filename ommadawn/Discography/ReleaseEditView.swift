@@ -2,10 +2,9 @@
 //  ReleaseEditView.swift
 //  ommadawn
 //
-//  Formulario para crear o editar un Release (título + tipo).
-//  Modo crear: `release` es nil, el formulario empieza en blanco.
-//  Modo editar: `release` viene relleno; guarda vía PATCH.
-//  En ambos casos llama a `onSave` con el Release que devuelve la API.
+//  Formulario para crear o editar un Release (título, tipo y descripción).
+//  La descripción admite sintaxis Markdown: la toolbar de la sección ofrece
+//  atajos para negrita, cursiva y enlace, más un botón de referencia rápida.
 //
 
 import SwiftUI
@@ -20,14 +19,19 @@ struct ReleaseEditView: View {
 
     @State private var title: String
     @State private var type: ReleaseType
+    @State private var description: String
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var showingCheatsheet = false
+
+    @State private var markdownController = MarkdownEditorController()
 
     init(release: Release? = nil, onSave: @escaping (Release) -> Void) {
         self.release = release
         self.onSave = onSave
-        _title = State(initialValue: release?.title ?? "")
-        _type  = State(initialValue: release?.release_type ?? .studio)
+        _title       = State(initialValue: release?.title ?? "")
+        _type        = State(initialValue: release?.release_type ?? .studio)
+        _description = State(initialValue: release?.description ?? "")
     }
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
@@ -48,6 +52,14 @@ struct ReleaseEditView: View {
                         }
                     }
                 }
+
+                MarkdownEditorSection(
+                    "Descripción",
+                    text: $description,
+                    controller: markdownController,
+                    editorHeight: 220,
+                    onCheatsheet: { showingCheatsheet = true }
+                )
 
                 if let errorMessage {
                     Section {
@@ -71,20 +83,32 @@ struct ReleaseEditView: View {
                 }
             }
             .disabled(isSaving)
+            .sheet(isPresented: $showingCheatsheet) {
+                MarkdownCheatsheetView()
+            }
         }
     }
 
+    // MARK: - Guardar
+
     private func save() async {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let desc = description.trimmingCharacters(in: .whitespacesAndNewlines)
         isSaving = true
         errorMessage = nil
         defer { isSaving = false }
         do {
             let saved: Release
             if let existing = release {
-                saved = try await store.updateRelease(id: existing.id, title: trimmed, type: type)
+                saved = try await store.updateRelease(
+                    id: existing.id, title: trimmed, type: type,
+                    description: desc.isEmpty ? nil : desc
+                )
             } else {
-                saved = try await store.createRelease(title: trimmed, type: type)
+                saved = try await store.createRelease(
+                    title: trimmed, type: type,
+                    description: desc.isEmpty ? nil : desc
+                )
             }
             onSave(saved)
             dismiss()
@@ -114,6 +138,7 @@ struct ReleaseEditView: View {
 #Preview("Editar") {
     ReleaseEditView(release: Release(
         id: 1, title: "Tubular Bells", release_type: .studio,
+        description: "El álbum debut de Mike Oldfield, grabado en 1973.",
         created_at: .now, editions: []
     )) { _ in }
     .environment(AuthSession(initialState: .signedOut))

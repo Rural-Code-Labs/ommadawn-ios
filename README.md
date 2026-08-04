@@ -29,10 +29,11 @@ para esta app. Android queda para el futuro con otra base de código.
   (solo visible a admins); perfil de usuario editable con avatar y selector de país con
   bandera; ajustes de apariencia sincronizados con el servidor (en el menú de cuenta);
   gestión de administradores para superadmins; pantalla "Acerca de"; edición completa
-  del catálogo para admins (disco, edición, tracklist e imágenes con ↑↓ ordenación);
-  badge de ediciones en portada; filtros multi-selección (tipo, año, sello, país) en la
-  hoja de ediciones con banderas; selector de país con frecuentes y buscador (soporta
-  "EU" — Unión Europea). Pendiente: revisar y pulir UX.
+  del catálogo para admins (disco con descripción Markdown, edición con créditos y notas
+  Markdown, tracklist, imágenes con ↑↓ ordenación); badge de ediciones en portada; filtros
+  multi-selección (tipo, año, sello, país) en la hoja de ediciones con banderas; selector
+  de país con frecuentes y buscador (soporta "EU" — Unión Europea). Pendiente: mostrar
+  los campos de texto enriquecido en las vistas de lectura.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -107,7 +108,9 @@ ommadawn/
 │   │   └── Release+Presentation.swift
 │   ├── Shared/                        # componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + lista ISO 3166-1 + "EU"
-│   │   └── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
+│   │   ├── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
+│   │   ├── MarkdownTextEditor.swift   # UITextView + MarkdownEditorController + MarkdownEditorSection
+│   │   └── MarkdownCheatsheetView.swift # referencia rápida de sintaxis Markdown
 │   ├── Design/
 │   │   ├── BrandMark.swift            # el logo "O" en Didot Italic como vista reutilizable
 │   │   ├── AppTheme.swift             # apariencia + extensión para sincronizar con API
