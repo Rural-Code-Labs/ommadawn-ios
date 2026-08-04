@@ -308,7 +308,11 @@ API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha — lectura ✅, cabecera ✅, perfil ✅, ajustes ✅, admins ✅, edición completa del catálogo ✅; pendiente: pulir UX |
-| **5 — Conciertos** | Giras, fechas, setlists. | Pendiente |
-| **6 — Libros** | Bibliografía. | Pendiente |
+| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha — lectura ✅, cabecera ✅, perfil ✅, ajustes ✅, admins ✅, edición completa del catálogo ✅; pendiente: nombre de edición, créditos por pista, sello seleccionable |
+| **5 — Mejoras de autenticación** | Cambio de contraseña, recuperación por email, verificación de correo. | Pendiente |
+| **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
+| **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
+| **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
+| **9 — Conciertos** | Giras, fechas, setlists. | Pendiente |
+| **10 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar. | Pendiente |
