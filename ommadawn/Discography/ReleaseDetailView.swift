@@ -57,6 +57,13 @@ struct ReleaseDetailView: View {
         release.editions.first { $0.id == selectedEditionID } ?? release.displayEdition
     }
 
+    private var editionTitle: String {
+        if let name = selectedEdition?.edition_name, !name.isEmpty {
+            return "\(release.title) – \(name)"
+        }
+        return release.title
+    }
+
     private var editionImages: [ReleaseImage] {
         selectedEdition?.images ?? []
     }
@@ -81,7 +88,7 @@ struct ReleaseDetailView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     if let desc = release.description, !desc.isEmpty {
                         HStack(alignment: .firstTextBaseline) {
-                            Text(release.title)
+                            Text(editionTitle)
                                 .font(.title2.bold())
                             Spacer()
                             Button {
@@ -99,7 +106,7 @@ struct ReleaseDetailView: View {
                                 .frame(height: descHeight)
                         }
                     } else {
-                        Text(release.title)
+                        Text(editionTitle)
                             .font(.title2.bold())
                     }
 
@@ -455,6 +462,7 @@ private struct CollapsibleMarkdownSection: View {
 
 private struct EditionRow: View {
     let edition: Edition
+    let releaseTitle: String
     let coverURL: URL?
     let isSelected: Bool
 
@@ -481,7 +489,7 @@ private struct EditionRow: View {
 
             // Metadatos
             VStack(alignment: .leading, spacing: 2) {
-                Text(edition.edition_name ?? Country.find(edition.country)?.displayName ?? edition.country ?? "Edición")
+                Text(edition.edition_name.flatMap { $0.isEmpty ? nil : "\(releaseTitle) – \($0)" } ?? releaseTitle)
                     .font(.body)
                     .lineLimit(1)
 
@@ -587,6 +595,7 @@ private struct EditionListSheet: View {
                         ForEach(filteredEditions, id: \.id) { edition in
                             EditionRow(
                                 edition: edition,
+                                releaseTitle: release.title,
                                 coverURL: coverURL(of: edition),
                                 isSelected: edition.id == selectedEditionID
                             )
