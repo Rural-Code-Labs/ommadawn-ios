@@ -489,6 +489,8 @@ private struct TrackEditRow: View {
     @Binding var track: EditableTrack
     let onDelete: () -> Void
 
+    @State private var creditsController = MarkdownEditorController()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 8) {
@@ -513,7 +515,23 @@ private struct TrackEditRow: View {
                     .keyboardType(.numberPad)
                 TextField("Cara", text: $track.side)
                     .frame(width: 40)
-                TextField("Créditos del tema", text: $track.credits)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+            HStack(alignment: .top, spacing: 6) {
+                Color.clear.frame(width: 22)
+                MarkdownTextEditor(text: $track.credits, controller: creditsController)
+                    .frame(height: 54)
+                    .overlay(alignment: .topLeading) {
+                        if track.credits.isEmpty {
+                            Text("Créditos del tema")
+                                .foregroundStyle(.tertiary)
+                                .font(.body)
+                                .allowsHitTesting(false)
+                                .padding(.top, 4)
+                        }
+                    }
             }
             .font(.caption)
             .foregroundStyle(.secondary)
