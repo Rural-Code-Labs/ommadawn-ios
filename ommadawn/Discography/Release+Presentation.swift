@@ -50,6 +50,7 @@ extension ReleaseType {
         case .compilation: "Recopilatorio"
         case .single: "Single"
         case .bootleg: "Bootleg"
+        case .live: "Directo"
         }
     }
 }

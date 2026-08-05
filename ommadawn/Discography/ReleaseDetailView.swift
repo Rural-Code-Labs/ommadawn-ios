@@ -342,27 +342,56 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
     }
 
     private func tracklist(_ tracks: [Track]) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let sorted = tracks.sorted { a, b in
+            a.disc_number != b.disc_number ? a.disc_number < b.disc_number : a.position < b.position
+        }
+        let discs = Array(Set(sorted.map { $0.disc_number })).sorted()
+        let isMultiDisc = discs.count > 1
+
+        return VStack(alignment: .leading, spacing: 0) {
             Text("Temas")
                 .font(.headline)
                 .padding(.bottom, 8)
 
-            ForEach(tracks.sorted(by: { $0.position < $1.position })) { track in
-                HStack {
-                    Text("\(track.position)")
-                        .font(.callout.monospacedDigit())
+            ForEach(discs, id: \.self) { disc in
+                if isMultiDisc {
+                    Text("Disco \(disc)")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 24, alignment: .trailing)
-                    Text(track.title)
-                    Spacer()
-                    if let seconds = track.duration_seconds {
-                        Text(Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond)))
-                            .font(.callout.monospacedDigit())
-                            .foregroundStyle(.secondary)
-                    }
+                        .padding(.top, disc == discs.first! ? 0 : 12)
+                        .padding(.bottom, 4)
                 }
-                .padding(.vertical, 6)
-                Divider()
+                ForEach(sorted.filter { $0.disc_number == disc }) { track in
+                    VStack(alignment: .leading, spacing: 1) {
+                        HStack {
+                            let posLabel: String = {
+                                if let side = track.side, !side.isEmpty {
+                                    return "\(side)\(track.position)"
+                                }
+                                return "\(track.position)"
+                            }()
+                            Text(posLabel)
+                                .font(.callout.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .frame(width: 28, alignment: .trailing)
+                            Text(track.title)
+                            Spacer()
+                            if let seconds = track.duration_seconds {
+                                Text(Duration.seconds(seconds).formatted(.time(pattern: .minuteSecond)))
+                                    .font(.callout.monospacedDigit())
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        if let credits = track.credits, !credits.isEmpty {
+                            Text(credits)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 36)
+                        }
+                    }
+                    .padding(.vertical, 6)
+                    Divider()
+                }
             }
         }
     }

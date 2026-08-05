@@ -431,20 +431,33 @@ private struct TrackEditRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Button(action: onDelete) {
-                Image(systemName: "minus.circle.fill")
-                    .foregroundStyle(.red)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                Button(action: onDelete) {
+                    Image(systemName: "minus.circle.fill")
+                        .foregroundStyle(.red)
+                }
+                .buttonStyle(.borderless)
+
+                TextField("Título del tema", text: $track.title)
+
+                TextField("M:SS", text: $track.durationText)
+                    .multilineTextAlignment(.trailing)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 54)
+                    .keyboardType(.numbersAndPunctuation)
             }
-            .buttonStyle(.borderless)
-
-            TextField("Título del tema", text: $track.title)
-
-            TextField("M:SS", text: $track.durationText)
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(.secondary)
-                .frame(width: 54)
-                .keyboardType(.numbersAndPunctuation)
+            HStack(spacing: 6) {
+                Color.clear.frame(width: 22)
+                TextField("Disco", value: $track.discNumber, format: .number)
+                    .frame(width: 40)
+                    .keyboardType(.numberPad)
+                TextField("Cara", text: $track.side)
+                    .frame(width: 40)
+                TextField("Créditos del tema", text: $track.credits)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 }
@@ -460,7 +473,7 @@ private struct TrackEditRow: View {
 }
 
 #Preview("Editar") {
-    let track = Track(id: 1, position: 1, title: "Tubular Bells Part One", duration_seconds: 1530)
+    let track = Track(id: 1, recording_id: 1, position: 1, disc_number: 1, title: "Tubular Bells Part One", duration_seconds: 1530)
     let edition = Edition(
         id: 1, country: "UK", label: "Virgin", edition_name: nil,
         catalog_number: "V2001", release_date: "1973-05-25",

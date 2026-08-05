@@ -35,19 +35,31 @@ struct EditionPayload {
     var tracks: [EditableTrack] = []
 
     var trackPayloads: [Components.Schemas.TrackCreate] {
-        tracks.enumerated().compactMap { index, track in
+        var discPositions: [Int: Int] = [:]
+        return tracks.compactMap { track in
             let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
             guard !title.isEmpty else { return nil }
-            return .init(position: index + 1, title: title, duration_seconds: track.durationSeconds)
+            discPositions[track.discNumber, default: 0] += 1
+            return .init(
+                position: discPositions[track.discNumber]!,
+                disc_number: track.discNumber,
+                side: track.side.nilIfEmpty,
+                title: title,
+                duration_seconds: track.durationSeconds,
+                credits: track.credits.nilIfEmpty
+            )
         }
     }
 }
 
-/// Modelo local de tema para el formulario (sin ID de API: la posición es el índice).
+/// Modelo local de tema para el formulario (sin ID de API: la posición es el índice dentro de su disco).
 struct EditableTrack: Identifiable {
     var id = UUID()
     var title: String = ""
     var durationText: String = ""  // "M:SS" o "H:MM:SS" como el usuario lo introduce
+    var discNumber: Int = 1
+    var side: String = ""          // "A", "B"… solo para vinilos
+    var credits: String = ""
 
     var durationSeconds: Int? {
         let parts = durationText.split(separator: ":").compactMap { Int($0) }
@@ -58,13 +70,19 @@ struct EditableTrack: Identifiable {
         }
     }
 
-    init(title: String = "", durationText: String = "") {
+    init(title: String = "", durationText: String = "", discNumber: Int = 1, side: String = "", credits: String = "") {
         self.title = title
         self.durationText = durationText
+        self.discNumber = discNumber
+        self.side = side
+        self.credits = credits
     }
 
     init(from track: Track) {
         self.title = track.title
+        self.discNumber = track.disc_number
+        self.side = track.side ?? ""
+        self.credits = track.credits ?? ""
         if let secs = track.duration_seconds {
             let h = secs / 3600
             let m = (secs % 3600) / 60
@@ -175,7 +193,7 @@ struct DiscographyStore {
             let body = Components.Schemas.EditionCreate(
                 country: data.country,
                 label: data.label.nilIfEmpty,
-                edition_name: data.editionName.nilIfEmpty,
+                edition_name: data.editionName.trimmingCharacters(in: .whitespacesAndNewlines),
                 catalog_number: data.catalogNumber.nilIfEmpty,
                 release_date: data.releaseDate,
                 format: data.format,
@@ -204,7 +222,7 @@ struct DiscographyStore {
             let body = Components.Schemas.EditionUpdate(
                 country: data.country,
                 label: data.label.nilIfEmpty,
-                edition_name: data.editionName.nilIfEmpty,
+                edition_name: data.editionName.trimmingCharacters(in: .whitespacesAndNewlines),
                 catalog_number: data.catalogNumber.nilIfEmpty,
                 release_date: data.releaseDate,
                 format: data.format,
