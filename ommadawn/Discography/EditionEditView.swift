@@ -192,11 +192,70 @@ struct EditionEditView: View {
         }
     }
 
+    // Grupos ordenados por disco y cara para la lista editable.
+    private var trackGroups: [(header: String?, ids: [UUID])] {
+        let isMultiDisc = Set(tracks.map { $0.discNumber }).count > 1
+        let hasSides = tracks.contains { !$0.side.isEmpty }
+
+        let sorted = tracks.sorted { a, b in
+            if a.discNumber != b.discNumber { return a.discNumber < b.discNumber }
+            let sa = a.side.isEmpty ? nil : a.side
+            let sb = b.side.isEmpty ? nil : b.side
+            switch (sa, sb) {
+            case (nil, _?): return true
+            case (_?, nil): return false
+            case (let x?, let y?): return x < y
+            default: return false
+            }
+        }
+
+        guard isMultiDisc || hasSides else {
+            return [(header: nil, ids: sorted.map { $0.id })]
+        }
+
+        var groups: [(header: String?, ids: [UUID])] = []
+        var lastDisc: Int? = nil
+        var lastSide: String? = nil
+
+        for track in sorted {
+            let side = track.side.isEmpty ? nil : track.side
+            if track.discNumber != lastDisc || side != lastSide {
+                lastDisc = track.discNumber
+                lastSide = side
+                let parts = [
+                    isMultiDisc ? "Disco \(track.discNumber)" : nil,
+                    side.map { "Cara \($0)" }
+                ].compactMap { $0 }
+                groups.append((header: parts.joined(separator: " · "), ids: [track.id]))
+            } else {
+                groups[groups.count - 1].ids.append(track.id)
+            }
+        }
+        return groups
+    }
+
+    private func trackBinding(for id: UUID) -> Binding<EditableTrack> {
+        Binding(
+            get: { tracks.first { $0.id == id } ?? EditableTrack() },
+            set: { val in
+                if let idx = tracks.firstIndex(where: { $0.id == id }) { tracks[idx] = val }
+            }
+        )
+    }
+
     private var tracklistSection: some View {
         Section("Temas") {
-            ForEach($tracks) { $track in
-                TrackEditRow(track: $track) {
-                    tracks.removeAll { $0.id == track.id }
+            ForEach(Array(trackGroups.enumerated()), id: \.offset) { _, group in
+                if let header = group.header {
+                    Text(header)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 2, trailing: 16))
+                }
+                ForEach(group.ids, id: \.self) { id in
+                    TrackEditRow(track: trackBinding(for: id)) {
+                        tracks.removeAll { $0.id == id }
+                    }
                 }
             }
             Button {
