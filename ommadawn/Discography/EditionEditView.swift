@@ -489,10 +489,17 @@ private struct TrackEditRow: View {
     @Binding var track: EditableTrack
     let onDelete: () -> Void
 
+    @Environment(AuthSession.self) private var session
+    private var store: DiscographyStore { DiscographyStore(client: session.client) }
+
     @State private var creditsController = MarkdownEditorController()
+    @State private var showingSearch = false
+
+    private var isLinked: Bool { track.recordingId != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
+            // Fila principal: título + duración
             HStack(spacing: 8) {
                 Button(action: onDelete) {
                     Image(systemName: "minus.circle.fill")
@@ -500,14 +507,23 @@ private struct TrackEditRow: View {
                 }
                 .buttonStyle(.borderless)
 
-                TextField("Título del tema", text: $track.title)
+                if isLinked {
+                    Text(track.title)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    TextField("Título del tema", text: $track.title)
+                }
 
                 TextField("M:SS", text: $track.durationText)
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(.secondary)
                     .frame(width: 54)
                     .keyboardType(.numbersAndPunctuation)
+                    .disabled(isLinked)
             }
+
+            // Fila secundaria: disco, cara, botón enlace/búsqueda
             HStack(spacing: 6) {
                 Color.clear.frame(width: 22)
                 TextField("Disco", value: $track.discNumber, format: .number)
@@ -515,26 +531,139 @@ private struct TrackEditRow: View {
                     .keyboardType(.numberPad)
                 TextField("Cara", text: $track.side)
                     .frame(width: 40)
+                Spacer()
+                if isLinked {
+                    HStack(spacing: 6) {
+                        Image(systemName: "link")
+                        Button {
+                            track.recordingId = nil
+                        } label: {
+                            Image(systemName: "xmark")
+                        }
+                        .buttonStyle(.borderless)
+                    }
+                } else {
+                    Button {
+                        showingSearch = true
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                }
             }
             .font(.caption)
             .foregroundStyle(.secondary)
 
+            // Créditos del tema
             HStack(alignment: .top, spacing: 6) {
                 Color.clear.frame(width: 22)
-                MarkdownTextEditor(text: $track.credits, controller: creditsController)
-                    .frame(height: 54)
-                    .overlay(alignment: .topLeading) {
-                        if track.credits.isEmpty {
-                            Text("Créditos del tema")
-                                .foregroundStyle(.tertiary)
-                                .font(.body)
-                                .allowsHitTesting(false)
-                                .padding(.top, 4)
+                if isLinked {
+                    Text(track.credits.isEmpty ? "Sin créditos" : track.credits)
+                        .foregroundStyle(track.credits.isEmpty ? .tertiary : .secondary)
+                        .font(.caption)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 4)
+                } else {
+                    MarkdownTextEditor(text: $track.credits, controller: creditsController)
+                        .frame(height: 54)
+                        .overlay(alignment: .topLeading) {
+                            if track.credits.isEmpty {
+                                Text("Créditos del tema")
+                                    .foregroundStyle(.tertiary)
+                                    .font(.body)
+                                    .allowsHitTesting(false)
+                                    .padding(.top, 4)
+                            }
+                        }
+                }
+            }
+            .foregroundStyle(.secondary)
+        }
+        .sheet(isPresented: $showingSearch) {
+            RecordingSearchSheet(store: store) { recording in
+                track.recordingId = recording.id
+                track.title = recording.title
+                track.credits = recording.credits ?? ""
+                if let secs = recording.duration_seconds {
+                    let h = secs / 3600
+                    let m = (secs % 3600) / 60
+                    let s = secs % 60
+                    track.durationText = h > 0
+                        ? String(format: "%d:%02d:%02d", h, m, s)
+                        : String(format: "%d:%02d", m, s)
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Buscador de grabaciones existentes
+
+private struct RecordingSearchSheet: View {
+    let store: DiscographyStore
+    let onSelect: (Components.Schemas.RecordingRead) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+    @State private var results: [Components.Schemas.RecordingRead] = []
+    @State private var isSearching = false
+    @State private var searchTask: Task<Void, Never>?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(results, id: \.id) { recording in
+                    Button {
+                        onSelect(recording)
+                        dismiss()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(recording.title).foregroundStyle(.primary)
+                            if let secs = recording.duration_seconds {
+                                Text(Duration.seconds(secs).formatted(.time(pattern: .minuteSecond)))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
                         }
                     }
+                }
             }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+            .overlay {
+                if isSearching {
+                    ProgressView()
+                } else if !query.isEmpty && results.isEmpty {
+                    ContentUnavailableView(
+                        "Sin resultados",
+                        systemImage: "magnifyingglass",
+                        description: Text("Ninguna grabación coincide con «\(query)».")
+                    )
+                } else if query.isEmpty {
+                    ContentUnavailableView(
+                        "Busca una grabación",
+                        systemImage: "music.note.list",
+                        description: Text("Escribe el título del tema que quieres reutilizar.")
+                    )
+                }
+            }
+            .navigationTitle("Buscar grabación")
+            .navigationBarTitleDisplayMode(.inline)
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Título del tema")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { dismiss() }
+                }
+            }
+            .onChange(of: query) { _, newValue in
+                searchTask?.cancel()
+                let q = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !q.isEmpty else { results = []; return }
+                searchTask = Task {
+                    try? await Task.sleep(for: .milliseconds(350))
+                    guard !Task.isCancelled else { return }
+                    isSearching = true
+                    results = (try? await store.searchRecordings(q: q)) ?? []
+                    isSearching = false
+                }
+            }
         }
     }
 }

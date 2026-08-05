@@ -37,17 +37,15 @@ struct EditionPayload {
     var trackPayloads: [Components.Schemas.TrackCreate] {
         var discPositions: [Int: Int] = [:]
         return tracks.compactMap { track in
-            let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !title.isEmpty else { return nil }
             discPositions[track.discNumber, default: 0] += 1
-            return .init(
-                position: discPositions[track.discNumber]!,
-                disc_number: track.discNumber,
-                side: track.side.nilIfEmpty,
-                title: title,
-                duration_seconds: track.durationSeconds,
-                credits: track.credits.nilIfEmpty
-            )
+            let pos = discPositions[track.discNumber]!
+            if let rid = track.recordingId {
+                return .init(position: pos, disc_number: track.discNumber, side: track.side.nilIfEmpty, recording_id: rid)
+            } else {
+                let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !title.isEmpty else { return nil }
+                return .init(position: pos, disc_number: track.discNumber, side: track.side.nilIfEmpty, title: title, duration_seconds: track.durationSeconds, credits: track.credits.nilIfEmpty)
+            }
         }
     }
 }
@@ -55,6 +53,7 @@ struct EditionPayload {
 /// Modelo local de tema para el formulario (sin ID de API: la posición es el índice dentro de su disco).
 struct EditableTrack: Identifiable {
     var id = UUID()
+    var recordingId: Int? = nil    // nil → grabación nueva; non-nil → reutilizar grabación existente
     var title: String = ""
     var durationText: String = ""  // "M:SS" o "H:MM:SS" como el usuario lo introduce
     var discNumber: Int = 1
@@ -79,6 +78,7 @@ struct EditableTrack: Identifiable {
     }
 
     init(from track: Track) {
+        self.recordingId = track.recording_id
         self.title = track.title
         self.discNumber = track.disc_number
         self.side = track.side ?? ""
@@ -356,5 +356,21 @@ struct DiscographyStore {
         } catch {
             throw DiscographyError.network(error)
         }
+    }
+
+    // MARK: - Grabaciones
+
+    func searchRecordings(q: String) async throws -> [Components.Schemas.RecordingRead] {
+        do {
+            let output = try await client.search_recordings_api_v1_discography_recordings_get(
+                .init(query: .init(q: q))
+            )
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
     }
 }
