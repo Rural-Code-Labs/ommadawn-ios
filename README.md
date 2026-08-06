@@ -310,7 +310,7 @@ API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha — lectura ✅, cabecera ✅, perfil ✅, ajustes ✅, admins ✅, edición completa del catálogo ✅, edición directa de grabaciones ✅, indicador de uso en buscador ✅, nombre de edición ✅, créditos por pista ✅; pendiente: sello seleccionable |
+| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha — lectura ✅, cabecera ✅, perfil ✅, ajustes ✅, admins ✅, edición completa del catálogo ✅, edición directa de grabaciones ✅, indicador de uso en buscador ✅, nombre de edición ✅, créditos por pista ✅, sello seleccionable ✅; sin pendientes conocidos |
 | **5 — Mejoras de autenticación** | Cambio de contraseña, recuperación por email, verificación de correo. | Pendiente |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |

@@ -154,7 +154,7 @@ Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 | ~~4.1~~ | ~~**Rediseño de vista de discografía**~~: portada grande, galería, secciones desplegables, banderas de país. ✅ hecho (ago 2026). | ✅ |
 | ~~4.2~~ | ~~**Nombre de edición en el detalle**~~: `edition_name` se muestra junto al título — "Tubular Bells – Deluxe Edition". ✅ hecho. | ✅ |
 | ~~4.3~~ | ~~**Créditos por pista**~~: créditos editables en `EditionEditView` (via linked recordings) y mostrados en `ReleaseDetailView` bajo cada track. ✅ hecho. | ✅ |
-| 4.4 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. | 🔴 API: endpoint `/labels` (listado + creación) |
+| ~~4.4~~ | ~~**Sello seleccionable**~~: `LabelPickerView` con buscador en tiempo real, contador de ediciones por sello, crear nuevo (POST /labels), eliminar si 0 ediciones. `Edition.label` es ahora `LabelRead` anidado (no texto libre). ✅ hecho (6 ago 2026). | ✅ |
 
 ### Backlog — Fase 5: Mejoras de autenticación
 
