@@ -38,7 +38,9 @@ struct EditionEditView: View {
     @State private var notes: String
 
     // MARK: - Tracklist
+    private let originalTracks: [Track]   // snapshot al abrir; para detectar cambios en grabaciones vinculadas
     @State private var tracks: [EditableTrack]
+    @State private var pendingDeleteRecordingIDs: [Int] = []
 
     // MARK: - Imágenes (solo en modo edición)
     @State private var images: [ReleaseImage]
@@ -80,6 +82,7 @@ struct EditionEditView: View {
             _releaseDate  = State(initialValue: Date.now)
         }
 
+        self.originalTracks = edition?.tracks ?? []
         _tracks = State(initialValue: edition?.tracks
             .sorted { $0.position < $1.position }
             .map { EditableTrack(from: $0) } ?? [])
@@ -254,6 +257,9 @@ struct EditionEditView: View {
                 }
                 ForEach(group.ids, id: \.self) { id in
                     TrackEditRow(track: trackBinding(for: id)) {
+                        if let rid = tracks.first(where: { $0.id == id })?.recordingId {
+                            pendingDeleteRecordingIDs.append(rid)
+                        }
                         tracks.removeAll { $0.id == id }
                     }
                 }
@@ -449,12 +455,38 @@ struct EditionEditView: View {
         )
 
         do {
+            // 1. PATCH grabaciones vinculadas que hayan cambiado
+            let originalByRid: [Int: Track] = Dictionary(
+                uniqueKeysWithValues: originalTracks.map { ($0.recording_id, $0) }
+            )
+            for track in tracks {
+                guard let rid = track.recordingId,
+                      let original = originalByRid[rid] else { continue }
+                let newCredits = track.credits.trimmingCharacters(in: .whitespacesAndNewlines)
+                let origCredits = original.credits ?? ""
+                guard track.title != original.title
+                   || track.durationSeconds != original.duration_seconds
+                   || newCredits != origCredits
+                else { continue }
+                try await store.updateRecording(
+                    id: rid, title: track.title,
+                    durationSeconds: track.durationSeconds, credits: track.credits
+                )
+            }
+
+            // 2. Guardar la edición
             let saved: Edition
             if let existing = edition {
                 saved = try await store.updateEdition(releaseID: release.id, editionID: existing.id, data: payload)
             } else {
                 saved = try await store.createEdition(releaseID: release.id, data: payload)
             }
+
+            // 3. Intentar borrar grabaciones que quedaron huérfanas (best-effort)
+            for rid in pendingDeleteRecordingIDs {
+                try? await store.deleteRecording(id: rid)
+            }
+
             onSave(saved)
             dismiss()
         } catch let error as DiscographyError {
@@ -507,20 +539,13 @@ private struct TrackEditRow: View {
                 }
                 .buttonStyle(.borderless)
 
-                if isLinked {
-                    Text(track.title)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                } else {
-                    TextField("Título del tema", text: $track.title)
-                }
+                TextField("Título del tema", text: $track.title)
 
                 TextField("M:SS", text: $track.durationText)
                     .multilineTextAlignment(.trailing)
                     .foregroundStyle(.secondary)
                     .frame(width: 54)
                     .keyboardType(.numbersAndPunctuation)
-                    .disabled(isLinked)
             }
 
             // Fila secundaria: disco, cara, botón enlace/búsqueda
@@ -533,15 +558,19 @@ private struct TrackEditRow: View {
                     .frame(width: 40)
                 Spacer()
                 if isLinked {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 4) {
                         Image(systemName: "link")
                         Button {
                             track.recordingId = nil
                         } label: {
                             Image(systemName: "xmark")
+                                .foregroundStyle(.red)
                         }
                         .buttonStyle(.borderless)
                     }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(.secondary.opacity(0.12)))
                 } else {
                     Button {
                         showingSearch = true
@@ -557,25 +586,17 @@ private struct TrackEditRow: View {
             // Créditos del tema
             HStack(alignment: .top, spacing: 6) {
                 Color.clear.frame(width: 22)
-                if isLinked {
-                    Text(track.credits.isEmpty ? "Sin créditos" : track.credits)
-                        .foregroundStyle(track.credits.isEmpty ? .tertiary : .secondary)
-                        .font(.caption)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 4)
-                } else {
-                    MarkdownTextEditor(text: $track.credits, controller: creditsController)
-                        .frame(height: 54)
-                        .overlay(alignment: .topLeading) {
-                            if track.credits.isEmpty {
-                                Text("Créditos del tema")
-                                    .foregroundStyle(.tertiary)
-                                    .font(.body)
-                                    .allowsHitTesting(false)
-                                    .padding(.top, 4)
-                            }
+                MarkdownTextEditor(text: $track.credits, controller: creditsController)
+                    .frame(height: 54)
+                    .overlay(alignment: .topLeading) {
+                        if track.credits.isEmpty {
+                            Text("Créditos del tema")
+                                .foregroundStyle(.tertiary)
+                                .font(.body)
+                                .allowsHitTesting(false)
+                                .padding(.top, 4)
                         }
-                }
+                    }
             }
             .foregroundStyle(.secondary)
         }
@@ -617,11 +638,17 @@ private struct RecordingSearchSheet: View {
                         onSelect(recording)
                         dismiss()
                     } label: {
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(recording.title).foregroundStyle(.primary)
                             if let secs = recording.duration_seconds {
                                 Text(Duration.seconds(secs).formatted(.time(pattern: .minuteSecond)))
                                     .font(.caption).foregroundStyle(.secondary)
+                            }
+                            if let usage = recording.usages?.first {
+                                Text(usageLabel(usage))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .italic()
                             }
                         }
                     }
@@ -665,6 +692,13 @@ private struct RecordingSearchSheet: View {
                 }
             }
         }
+    }
+
+    private func usageLabel(_ usage: Components.Schemas.RecordingUsageRead) -> String {
+        var parts: [String] = [usage.release_title]
+        if let name = usage.edition_name, !name.isEmpty { parts.append(name) }
+        if let date = usage.release_date { parts.append(String(date.prefix(4))) }
+        return parts.joined(separator: " · ")
     }
 }
 

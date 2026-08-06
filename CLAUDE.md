@@ -43,8 +43,9 @@ con otra base de código.
   (discografía: listado con grid/lista/filtro/orden y detalle con tracklist, **solo
   lectura**; cabecera común de la app con avatar a la izquierda y engranaje de ajustes a
   la derecha; perfil de usuario editable con avatar; gestión de administradores para
-  superadmins; pantalla de Ajustes con apariencia sincronizada con el servidor). Ver plan
-  abajo.
+  superadmins; pantalla de Ajustes con apariencia sincronizada con el servidor; edición
+  directa de grabaciones vinculadas con borrado huérfano automático e indicador de uso
+  en el buscador). Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
 - **Edición de catálogo para admins (Fase 4, hecha en 3 capas, 30 jul 2026)**:
@@ -138,6 +139,11 @@ con otra base de código.
 - **Preview Markdown en el editor y renderizado compartido (4 ago 2026)**:
   - **Botón de preview (👁)** en la toolbar de `MarkdownEditorSection`: al pulsarlo abre `MarkdownPreviewSheet` (WKWebView) con el contenido actual del campo. El estado de preview (`showingPreview`, `previewTitle`, `previewText`) vive en `MarkdownEditorController` (referencia estable en el padre) y el `.sheet` se ancla al `Form` del caller (`EditionEditView`, `ReleaseEditView`) — necesario porque un `.sheet` anclado a una celda de Form/List dentro de otra hoja puede ser reseteado por SwiftUI cuando el teclado se descarta y la jerarquía se recrea.
   - **Código de renderizado Markdown centralizado en `MarkdownTextEditor.swift`**: `MarkdownWebView` (para hojas modales), `DynamicMarkdownWebView` (para incrustar en `ScrollView`, altura adaptada con `WKNavigationDelegate`), `MarkdownPreviewSheet` (hoja compartida con ✕), `markdownStyledHTML` (con padding 16px, para hojas), `markdownInlineHTML` (sin padding, para incrustar), `markdownToHTML` + `inlineMd` (conversor bloque/inline Markdown→HTML). `ReleaseDetailView` ya no duplica este código.
+- **Grabaciones: edición directa, borrado huérfano e indicador de uso (6 ago 2026)**:
+  - **Edición directa de grabaciones vinculadas**: `TrackEditRow` pasa de tener los campos de solo lectura cuando hay `recording_id` (modo "linked") a mostrarlos siempre editables. Al guardar la edición, `EditionEditView.save()` hace un **diff con `originalTracks`** (snapshot inmutable del estado al abrir): si el título, duración o créditos de una grabación vinculada cambiaron, llama a `PATCH /discography/recordings/{id}` (`DiscographyStore.updateRecording`) antes de actualizar la edición. Las grabaciones recién vinculadas (no presentes en `originalTracks`) se saltan porque ya tienen los datos correctos.
+  - **Borrado automático de grabaciones huérfanas**: al pulsar ⊖ en una fila del tracklist, si el track tiene `recording_id` se añade a `pendingDeleteRecordingIDs`. Tras un `save()` exitoso, se intenta `DELETE /discography/recordings/{id}` (`DiscographyStore.deleteRecording`) en cada ID acumulado — best-effort (`try?`); la API devuelve `409` si la grabación sigue en uso en otra edición (se conserva silenciosamente) o `204` si era huérfana (se elimina).
+  - **Cápsula visual "linked"**: el indicador de grabación vinculada en `TrackEditRow` se muestra como una cápsula pequeña con el icono 🔗 y la ✕ en rojo (`.foregroundStyle(.red)`). La ✕ desvincula (pone `recording_id = nil`); la fila pasa a modo "libre" y el siguiente guardado crea una grabación nueva en vez de parchear la existente.
+  - **Indicador de uso en el buscador**: `RecordingSearchSheet` muestra bajo cada resultado una línea en cursiva secundaria con el release y edición donde se usa esa grabación (ej. "Tubular Bells · 1973"). Requirió añadir `usages: [RecordingUsageRead]` (default `[]`) a `RecordingRead` en la API. El nuevo schema `RecordingUsageRead` tiene `release_id`, `release_title`, `edition_id` (required) y `edition_name`, `release_date` (optional). El helper `usageLabel(_:)` en `EditionEditView` formatea la primera entrada. Contrato `openapi.json` actualizado tras el cambio en la API.
 
 ### Backlog — Fase 4 (activa)
 

@@ -373,4 +373,48 @@ struct DiscographyStore {
         } catch let e as DiscographyError { throw e }
         catch { throw DiscographyError.network(error) }
     }
+
+    func updateRecording(id: Int, title: String, durationSeconds: Int?, credits: String) async throws {
+        do {
+            let output = try await client.update_recording_api_v1_discography_recordings__recording_id__patch(
+                .init(
+                    path: .init(recording_id: id),
+                    body: .json(.init(
+                        title: title,
+                        duration_seconds: durationSeconds,
+                        credits: credits.nilIfEmpty
+                    ))
+                )
+            )
+            switch output {
+            case .ok: return
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Intenta borrar la grabación. Devuelve `false` si sigue en uso (409).
+    @discardableResult
+    func deleteRecording(id: Int) async throws -> Bool {
+        do {
+            let output = try await client.delete_recording_api_v1_discography_recordings__recording_id__delete(
+                .init(path: .init(recording_id: id))
+            )
+            switch output {
+            case .noContent: return true
+            case .conflict: return false
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: return true
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
 }

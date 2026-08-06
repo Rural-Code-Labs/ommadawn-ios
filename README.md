@@ -37,7 +37,9 @@ para esta app. Android queda para el futuro con otra base de código.
   créditos y notas de la edición, todo renderizado con WKWebView para Markdown real (títulos,
   listas, negritas, etc.) y altura adaptada al contenido; metadatos como tabla (País, Sello,
   Publicación con fecha completa, Formato, Cat.); botón de preview (👁) en el editor Markdown
-  para ver el resultado renderizado sin salir del formulario.
+  para ver el resultado renderizado sin salir del formulario; edición directa de grabaciones
+  vinculadas (🔗 cápsula + ✕ para desvincular), borrado automático de grabaciones huérfanas
+  al quitar un track, e indicador de uso en el buscador de grabaciones.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -308,7 +310,7 @@ API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha — lectura ✅, cabecera ✅, perfil ✅, ajustes ✅, admins ✅, edición completa del catálogo ✅; pendiente: nombre de edición, créditos por pista, sello seleccionable |
+| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha — lectura ✅, cabecera ✅, perfil ✅, ajustes ✅, admins ✅, edición completa del catálogo ✅, edición directa de grabaciones ✅, indicador de uso en buscador ✅; pendiente: nombre de edición, créditos por pista en detalle, sello seleccionable |
 | **5 — Mejoras de autenticación** | Cambio de contraseña, recuperación por email, verificación de correo. | Pendiente |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
