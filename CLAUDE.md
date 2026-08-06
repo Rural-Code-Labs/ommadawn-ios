@@ -44,7 +44,8 @@ con otra base de código.
   la app, perfil de usuario editable con avatar, gestión de administradores, edición
   completa del catálogo para admins, sello seleccionable) y **Fase 5 en marcha** (login con
   Google: alta/login básico, conflicto de email, nombre de usuario editable una sola vez
-  cuando lo asignó Google, y vincular/desvincular Google desde el perfil — ver más abajo).
+  cuando lo asignó Google, vincular/desvincular Google desde el perfil, y cambiar/agregar/
+  quitar contraseña — ver más abajo).
   Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
@@ -207,12 +208,6 @@ Google. Probado en simulador y en dispositivo físico contra pre-producción.
   pero llama a `AuthSession.linkGoogleAccount(idToken:)` → `POST /auth/me/google`,
   autenticado, no es un login) o "Desconectar Google" (`confirmationDialog` de aviso →
   `AuthSession.unlinkGoogleAccount()` → `DELETE /auth/me/google`).
-  - **Sin campo "tiene contraseña" en el contrato**: `UserRead` no expone si la cuenta
-    tiene `hashed_password`, así que "Desconectar Google" se muestra siempre que
-    `has_google` sea `true`, sin ocultarlo de antemano. Si Google es la única forma de
-    entrar, el servidor rechaza con `409` (`detail: "google_only_access"`) y la app
-    traduce eso en un mensaje explicando por qué, en vez de pedir un campo nuevo a la
-    API solo para prevenir un caso que el error ya cubre igual de bien.
   - **`google_already_linked`** (409 al vincular): esa cuenta de Google ya pertenece a
     otro usuario — no se puede compartir una misma cuenta de Google entre dos usuarios.
   - **Errores como `alert`, no como texto en la sección**: la primera versión ponía el
@@ -224,6 +219,37 @@ Google. Probado en simulador y en dispositivo físico contra pre-producción.
   - `UIApplication.topViewController` se extrajo a `Shared/UIApplication+
     TopViewController.swift`: lo necesitan tanto `LoginView` (login) como
     `AccountProfileView` (vinculación) para presentar el navegador embebido del SDK.
+- **Cambiar / agregar / quitar contraseña** (5.4, 6 ago 2026): un único endpoint,
+  `POST /auth/me/password`, cubre tanto cambiarla (cuenta con contraseña) como ponerla
+  por primera vez (cuenta solo-Google) — `current_password` es opcional a nivel de
+  schema y el servicio decide si hace falta según si `hashed_password` ya existe.
+  `DELETE /auth/me/password` es el espejo: la quita, y rechaza con `409`
+  (`detail: "password_only_access"`) si no hay Google vinculado (se quedaría sin
+  ninguna forma de entrar) — mismo criterio que `google_only_access` al desvincular
+  Google.
+  - **`has_password` en el perfil**: igual que `has_google`, `UserRead` expone si la
+    cuenta tiene contraseña. Con esto ya no hace falta adivinar nada por UI: el botón
+    "Quitar contraseña" solo aparece si `has_password && has_google`, y
+    `ChangePasswordView` oculta el campo "Contraseña actual" por completo (no lo deja
+    vacío con una nota) cuando `hasPassword` es `false`.
+  - **`ChangePasswordView.swift`** (`Account/`): hoja con contraseña actual (solo si
+    `hasPassword`), nueva y confirmar. Mismo patrón de validación en cliente que
+    `RegisterView` (8-128 caracteres, coinciden). El botón que la abre dice "Cambiar
+    contraseña" o "Agregar contraseña" según `has_password`, y el título de la hoja
+    hace lo mismo.
+  - **`PasswordChangeError`**: enum propio (no reutiliza `ProfileError`) porque el
+    `401` de `POST /auth/me/password` significa siempre "contraseña actual
+    incorrecta" (lo garantiza el propio contrato de la API, no hay otra causa posible
+    de 401 en ese endpoint una vez pasa el Bearer) — mapearlo a "sesión caducada"
+    habría sido un mensaje engañoso. El `401` de `DELETE /auth/me/password` sí es
+    sesión caducada de verdad (ese endpoint no lleva contraseña que verificar), así
+    que usa un caso distinto (`sessionExpired`) dentro del mismo enum.
+  - **Refrescar el perfil tras `204 No Content`**: ni `POST` ni `DELETE
+    /auth/me/password` devuelven el usuario actualizado. Sin volver a pedir `GET /me`
+    tras un cambio con éxito, la app se quedaba creyendo que `has_password` seguía
+    como antes (p. ej. mostrando otra vez el formulario de "poner contraseña por
+    primera vez" después de ponerla). `AuthSession.changePassword`/`removePassword`
+    llaman a `fetchProfile()` y actualizan `state` al terminar.
 
 ### Backlog — Fase 4 (completa)
 
@@ -253,7 +279,7 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 | 5.1 | **Google Sign-In — login/registro básico**: botón "Continuar con Google" funcional en `LoginView`. Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.2 | **Conflicto de email**: email de Google ya existente con contraseña → `409 email_conflict`, mensaje con sugerencia, sin auto-vincular ni duplicar. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.3 | **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" (mismo flujo SDK, llama a un endpoint de vinculación) y "Desconectar Google". Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
-| 5.4 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | Pendiente | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
+| 5.4 | **Cambiar/agregar/quitar contraseña**: hoja en `AccountProfileView` con contraseña actual (si aplica) + nueva + confirmación. Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.5 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | Pendiente | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
 | 5.6 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | Pendiente | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
 
@@ -280,9 +306,19 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 | 5.3.4 | Manejo de errores (`google_already_linked`, `google_only_access`, cancelado, servidor) como `.alert` en vez de texto en la sección | app |
 | 5.3.5 | Probado en simulador | app |
 
+**Desglose de 5.4** (todo hecho el 6 ago 2026):
+
+| # | Subtarea | Dónde |
+|---|---|---|
+| 5.4.1 | `POST /auth/me/password`: cambia o pone la contraseña por primera vez (`current_password` opcional a nivel de schema, obligatoria solo si la cuenta ya tenía una) | `ommadawn-api` |
+| 5.4.2 | `AuthSession.changePassword(currentPassword:newPassword:)` | app |
+| 5.4.3 | `ChangePasswordView.swift`: hoja con validación local (8-128 caracteres, coinciden) | app |
+| 5.4.4 | Manejo de errores (`wrongCurrentPassword`, `invalidData`, servidor) | app |
+| 5.4.5 | Probado en simulador | app |
+| 5.4.6 | *(bonus, no estaba en el plan original)* `DELETE /auth/me/password` (quitarla, rechaza si no hay Google vinculado) + `has_password` en el perfil + botón "Quitar contraseña" | app + API |
+
 > 5.5 y 5.6 comparten infraestructura de email (proveedor SMTP o servicio transaccional) y
-> tiene sentido implementarlas juntas en el servidor cuando llegue su turno. 5.4 (cambiar
-> contraseña) puede ir antes o después, es independiente de esa infraestructura.
+> tiene sentido implementarlas juntas en el servidor cuando llegue su turno.
 
 ### Backlog — Fases futuras
 
@@ -494,6 +530,7 @@ ommadawn/
 │   ├── Account/
 │   │   ├── AccountMenu.swift          # Menú desplegable (nombre, apariencia, admin, logout)
 │   │   ├── AccountProfileView.swift   # Hoja de perfil: avatar + datos editables
+│   │   ├── ChangePasswordView.swift   # Cambiar/agregar contraseña
 │   │   ├── AccountAvatarView.swift    # Avatar circular reutilizable
 │   │   └── User+Presentation.swift    # displayName, avatarURL
 │   ├── Admin/                    # Gestión de administradores (solo superadmin)
@@ -631,7 +668,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, recuperación por email y verificación de correo al registrarse. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅, 5.3 vincular/desvincular desde perfil ✅. Pendiente: 5.4 cambiar contraseña, 5.5 recuperar contraseña, 5.6 verificación de correo. |
+| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, recuperación por email y verificación de correo al registrarse. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅, 5.3 vincular/desvincular desde perfil ✅, 5.4 cambiar/agregar/quitar contraseña ✅. Pendiente: 5.5 recuperar contraseña, 5.6 verificación de correo. |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

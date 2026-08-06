@@ -39,6 +39,22 @@ enum GoogleSignInError: Error {
     case network(Error)
 }
 
+/// Motivos por los que cambiar (o poner por primera vez) la contraseña
+/// puede fallar.
+///
+/// El servidor documenta que, en este endpoint, un `401` una vez pasado el
+/// `Bearer` solo puede significar una cosa: la `current_password` enviada
+/// no coincide con la actual — por eso NO se mapea a `sessionExpired` como
+/// en el resto de operaciones (sería un mensaje engañoso aquí).
+enum PasswordChangeError: Error {
+    case wrongCurrentPassword // 401 al cambiarla — la current_password no coincide
+    case sessionExpired       // 401 al quitarla — aquí no hay contraseña que verificar, es sesión
+    case invalidData          // 422 — nueva contraseña fuera de longitud, etc.
+    case passwordOnlyAccess   // 409 — al quitarla: no hay Google vinculado, se quedaría sin acceso
+    case unexpected(Int)
+    case network(Error)
+}
+
 /// Motivos por los que un registro puede fallar.
 enum RegisterError: Error {
     case alreadyTaken             // 409 — usuario o email ya en uso
@@ -259,6 +275,62 @@ final class AuthSession {
             throw error
         } catch {
             throw ProfileError.network(error)
+        }
+    }
+
+    /// Cambia la contraseña del usuario autenticado, o la pone por primera
+    /// vez si la cuenta se creó puramente por Google. `currentPassword` es
+    /// `nil` solo en ese segundo caso — el servidor decide si hace falta
+    /// según si la cuenta ya tenía una, no la app.
+    func changePassword(currentPassword: String?, newPassword: String) async throws {
+        do {
+            let output = try await client.change_password_api_v1_auth_me_password_post(
+                .init(body: .json(.init(
+                    current_password: currentPassword,
+                    new_password: newPassword
+                )))
+            )
+            switch output {
+            case .noContent:
+                // 204: no trae el usuario actualizado, pero `has_password`
+                // puede haber cambiado (alta de contraseña en cuenta
+                // solo-Google) — sin refrescar, la app se quedaría creyendo
+                // que la cuenta sigue sin contraseña.
+                state = .signedIn(try await fetchProfile())
+            case .unauthorized:
+                throw PasswordChangeError.wrongCurrentPassword
+            case .unprocessableContent:
+                throw PasswordChangeError.invalidData
+            case .undocumented(let statusCode, _):
+                throw PasswordChangeError.unexpected(statusCode)
+            }
+        } catch let error as PasswordChangeError {
+            throw error
+        } catch {
+            throw PasswordChangeError.network(error)
+        }
+    }
+
+    /// Quita la contraseña de la cuenta, que vuelve a depender solo de
+    /// Google. El servidor rechaza si no hay Google vinculado (se quedaría
+    /// sin ninguna forma de entrar).
+    func removePassword() async throws {
+        do {
+            let output = try await client.remove_password_api_v1_auth_me_password_delete(.init())
+            switch output {
+            case .noContent:
+                state = .signedIn(try await fetchProfile())
+            case .unauthorized:
+                throw PasswordChangeError.sessionExpired
+            case .conflict:
+                throw PasswordChangeError.passwordOnlyAccess
+            case .undocumented(let statusCode, _):
+                throw PasswordChangeError.unexpected(statusCode)
+            }
+        } catch let error as PasswordChangeError {
+            throw error
+        } catch {
+            throw PasswordChangeError.network(error)
         }
     }
 

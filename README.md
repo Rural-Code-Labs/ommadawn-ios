@@ -43,8 +43,9 @@ para esta app. Android queda para el futuro con otra base de código.
   seleccionable de una tabla (crear/eliminar).
 - 🚧 **Fase 5 — Mejoras de autenticación**: login con Google (SDK oficial, conflicto de
   email con sugerencia, sin auto-vincular), nombre de usuario editable una sola vez
-  cuando lo asigna Google. Pendiente: vincular/desvincular Google desde el perfil,
-  cambio y recuperación de contraseña, verificación de correo.
+  cuando lo asigna Google, vincular/desvincular Google desde el perfil, y cambiar/
+  agregar/quitar contraseña. Pendiente: recuperación de contraseña por email,
+  verificación de correo.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -221,15 +222,22 @@ Cómo está montado:
 - **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" o
   "Desconectar Google" en `AccountProfileView` (`POST`/`DELETE /auth/me/google`,
   autenticado). No se puede vincular una cuenta de Google ya enlazada a otro usuario
-  (`409`), ni desvincular si es la única forma de entrar (`409`) — la app no oculta el
-  botón de antemano (el contrato no expone si hay contraseña), deja que el error del
-  servidor lo explique. Los errores de esta sección se muestran con `.alert` (modal),
-  no como texto en la pantalla: un texto pegado a la sección puede quedar fuera de
-  vista si el usuario no hace scroll tras pulsar el botón.
+  (`409`), ni desvincular si es la única forma de entrar (`409`). Los errores de esta
+  sección se muestran con `.alert` (modal), no como texto en la pantalla: un texto
+  pegado a la sección puede quedar fuera de vista si el usuario no hace scroll tras
+  pulsar el botón.
+- **Cambiar / agregar / quitar contraseña**: un único endpoint (`POST /auth/me/password`)
+  cambia la contraseña o la pone por primera vez (cuenta creada solo por Google) —
+  `current_password` solo hace falta si la cuenta ya tenía una. `DELETE
+  /auth/me/password` la quita, rechazando con `409` si no hay Google vinculado (se
+  quedaría sin forma de entrar). `UserRead` expone `has_password` (igual que
+  `has_google`), así que la app sabe de antemano qué campos/botones mostrar: el botón
+  dice "Cambiar contraseña" o "Agregar contraseña" según corresponda, y "Quitar
+  contraseña" solo aparece si hay contraseña **y** Google vinculado a la vez.
 
 Endpoints de auth: `register`, `login`, `refresh`, `logout`, `google`, `me` (`GET`/`PATCH`),
-`me/avatar` (`POST`/`DELETE`), `me/google` (`POST`/`DELETE`), `users` (`GET`, superadmin),
-`users/{id}` (`PATCH`, superadmin).
+`me/avatar` (`POST`/`DELETE`), `me/google` (`POST`/`DELETE`), `me/password`
+(`POST`/`DELETE`), `users` (`GET`, superadmin), `users/{id}` (`PATCH`, superadmin).
 
 ---
 
@@ -335,7 +343,7 @@ API ya lo expone.
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, recuperación por email, verificación de correo. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez, vincular/desvincular desde perfil) ✅; pendiente: cambio y recuperación de contraseña, verificación de correo |
+| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, recuperación por email, verificación de correo. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez, vincular/desvincular desde perfil), cambiar/agregar/quitar contraseña ✅; pendiente: recuperación por email, verificación de correo |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

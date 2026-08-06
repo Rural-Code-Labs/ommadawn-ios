@@ -45,6 +45,7 @@ struct AccountAvatarView: View {
         email: "rafa@example.com",
         theme_preference: .system,
         has_google: false,
+        has_password: true,
         is_active: true,
         is_admin: false,
         is_super_admin: false,

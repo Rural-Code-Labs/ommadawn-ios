@@ -40,12 +40,17 @@ struct AccountProfileView: View {
     @State private var isSaving = false
     @State private var isLinkingGoogle = false
     @State private var showingUnlinkConfirmation = false
+    @State private var showingChangePassword = false
+    @State private var showingRemovePasswordConfirmation = false
+    @State private var isRemovingPassword = false
     @State private var errorMessage: String?
     /// Separado del `errorMessage` general: ese vive en su propia `Section`
     /// al final del formulario, demasiado lejos del botón de Google — un
     /// error ahí parece que el formulario entero falló, no que Google en
     /// concreto rechazó la acción. Este se pinta pegado a la sección.
     @State private var googleErrorMessage: String?
+    /// Mismo motivo que `googleErrorMessage`, para "Quitar contraseña".
+    @State private var passwordErrorMessage: String?
 
     private var user: User? {
         guard case .signedIn(let user) = session.state else { return nil }
@@ -94,6 +99,42 @@ struct AccountProfileView: View {
                         DatePicker("Fecha de nacimiento", selection: $birthDate, in: ...Date.now, displayedComponents: .date)
                             .labelsHidden()
                     }
+                }
+
+                Section("Seguridad") {
+                    Button(user?.has_password == true ? "Cambiar contraseña" : "Agregar contraseña") {
+                        showingChangePassword = true
+                    }
+                    if let user, user.has_password, user.has_google {
+                        Button("Quitar contraseña", role: .destructive) {
+                            showingRemovePasswordConfirmation = true
+                        }
+                        .disabled(isRemovingPassword)
+                    }
+                }
+                .sheet(isPresented: $showingChangePassword) {
+                    ChangePasswordView(hasPassword: user?.has_password ?? true)
+                        .environment(session)
+                }
+                .confirmationDialog(
+                    "¿Quitar la contraseña?",
+                    isPresented: $showingRemovePasswordConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button("Quitar", role: .destructive) { Task { await removePassword() } }
+                } message: {
+                    Text("Solo podrás entrar con tu cuenta de Google. Podrás volver a ponerte una contraseña cuando quieras.")
+                }
+                .alert(
+                    "Aviso",
+                    isPresented: Binding(
+                        get: { passwordErrorMessage != nil },
+                        set: { if !$0 { passwordErrorMessage = nil } }
+                    )
+                ) {
+                    Button("Vale", role: .cancel) {}
+                } message: {
+                    Text(passwordErrorMessage ?? "")
                 }
 
                 if let user {
@@ -340,6 +381,36 @@ struct AccountProfileView: View {
         }
     }
 
+    private func removePassword() async {
+        passwordErrorMessage = nil
+        isRemovingPassword = true
+        defer { isRemovingPassword = false }
+        do {
+            try await session.removePassword()
+        } catch let error as PasswordChangeError {
+            passwordErrorMessage = message(for: error)
+        } catch {
+            passwordErrorMessage = "No se pudo quitar la contraseña. Inténtalo de nuevo."
+        }
+    }
+
+    private func message(for error: PasswordChangeError) -> String {
+        switch error {
+        case .wrongCurrentPassword:
+            "La contraseña actual no es correcta."
+        case .sessionExpired:
+            "Tu sesión ha caducado. Vuelve a iniciar sesión."
+        case .invalidData:
+            "Revisa la nueva contraseña."
+        case .passwordOnlyAccess:
+            "Tu cuenta no tiene Google vinculado: la contraseña es tu única forma de entrar."
+        case .unexpected(let statusCode):
+            "Error del servidor (\(statusCode)). Inténtalo más tarde."
+        case .network:
+            "No se pudo conectar. Comprueba tu conexión."
+        }
+    }
+
     // MARK: - Perfil
 
     private func saveProfile() async {
@@ -440,6 +511,7 @@ struct AccountProfileView: View {
             full_name: "Rafa García",
             theme_preference: .system,
             has_google: true,
+            has_password: false,
             is_active: true,
             is_admin: false,
             is_super_admin: false,
