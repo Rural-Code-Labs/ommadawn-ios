@@ -152,8 +152,8 @@ Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 | # | Mejora | Requiere API |
 |---|---|---|
 | ~~4.1~~ | ~~**Rediseño de vista de discografía**~~: portada grande, galería, secciones desplegables, banderas de país. ✅ hecho (ago 2026). | ✅ |
-| 4.2 | **Nombre de edición en el detalle**: mostrar `edition_name` junto al título del disco cuando está informado — p.ej. "Tubular Bells · Deluxe Edition". Ahora solo se ve el título del release. | 🟢 Solo app |
-| 4.3 | **Créditos por pista**: cada track puede tener sus propios créditos (ej. "Guitarra: Mike Oldfield"). UI en `EditionEditView` para editarlos y en `ReleaseDetailView` para mostrarlos. | 🔴 API: campo `credits: String?` en `Track` |
+| ~~4.2~~ | ~~**Nombre de edición en el detalle**~~: `edition_name` se muestra junto al título — "Tubular Bells – Deluxe Edition". ✅ hecho. | ✅ |
+| ~~4.3~~ | ~~**Créditos por pista**~~: créditos editables en `EditionEditView` (via linked recordings) y mostrados en `ReleaseDetailView` bajo cada track. ✅ hecho. | ✅ |
 | 4.4 | **Sello seleccionable**: poder elegir un sello ya existente o crear uno nuevo al editar una edición. | 🔴 API: endpoint `/labels` (listado + creación) |
 
 ### Backlog — Fase 5: Mejoras de autenticación
