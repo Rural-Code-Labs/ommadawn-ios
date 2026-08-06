@@ -52,6 +52,7 @@ public struct AuthMiddleware: ClientMiddleware {
         "login_api_v1_auth_login_post",
         "register_api_v1_auth_register_post",
         "refresh_api_v1_auth_refresh_post",
+        "google_login_api_v1_auth_google_post",
     ]
 
     public func intercept(

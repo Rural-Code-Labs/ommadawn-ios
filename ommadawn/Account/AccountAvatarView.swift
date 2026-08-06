@@ -41,8 +41,10 @@ struct AccountAvatarView: View {
     AccountAvatarView(user: User(
         id: 1,
         username: "rafatest",
+        username_is_default: false,
         email: "rafa@example.com",
         theme_preference: .system,
+        has_google: false,
         is_active: true,
         is_admin: false,
         is_super_admin: false,

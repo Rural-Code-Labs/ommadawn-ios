@@ -39,13 +39,12 @@ con otra base de código.
   cliente Android aparte); la carpeta y el target Xcode se llaman `ommadawn`.
 - **Estado**: **Fase 3 hecha** (autenticación completa: registro, login por
   `username_or_email`, sesión persistente en Keychain, renovación automática — reactiva
-  ante `401` y **proactiva** usando `expires_in` — y logout) y **Fase 4 en marcha**
-  (discografía: listado con grid/lista/filtro/orden y detalle con tracklist, **solo
-  lectura**; cabecera común de la app con avatar a la izquierda y engranaje de ajustes a
-  la derecha; perfil de usuario editable con avatar; gestión de administradores para
-  superadmins; pantalla de Ajustes con apariencia sincronizada con el servidor; edición
-  directa de grabaciones vinculadas con borrado huérfano automático e indicador de uso
-  en el buscador). Ver plan abajo.
+  ante `401` y **proactiva** usando `expires_in` — y logout), **Fase 4 hecha** (discografía
+  completa: listado con grid/lista/filtro/orden, detalle con tracklist, cabecera común de
+  la app, perfil de usuario editable con avatar, gestión de administradores, edición
+  completa del catálogo para admins, sello seleccionable) y **Fase 5 en marcha** (login con
+  Google: alta/login básico, conflicto de email, y nombre de usuario editable una sola vez
+  cuando lo asignó Google — ver más abajo). Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
 - **Edición de catálogo para admins (Fase 4, hecha en 3 capas, 30 jul 2026)**:
@@ -145,7 +144,64 @@ con otra base de código.
   - **Cápsula visual "linked"**: el indicador de grabación vinculada en `TrackEditRow` se muestra como una cápsula pequeña con el icono 🔗 y la ✕ en rojo (`.foregroundStyle(.red)`). La ✕ desvincula (pone `recording_id = nil`); la fila pasa a modo "libre" y el siguiente guardado crea una grabación nueva en vez de parchear la existente.
   - **Indicador de uso en el buscador**: `RecordingSearchSheet` muestra bajo cada resultado una línea en cursiva secundaria con el release y edición donde se usa esa grabación (ej. "Tubular Bells · 1973"). Requirió añadir `usages: [RecordingUsageRead]` (default `[]`) a `RecordingRead` en la API. El nuevo schema `RecordingUsageRead` tiene `release_id`, `release_title`, `edition_id` (required) y `edition_name`, `release_date` (optional). El helper `usageLabel(_:)` en `EditionEditView` formatea la primera entrada. Contrato `openapi.json` actualizado tras el cambio en la API.
 
-### Backlog — Fase 4 (activa)
+## Login con Google (Fase 5, 6 ago 2026)
+
+Implementado de punta a punta: SDK oficial `GoogleSignIn-iOS` 9.2.0 vía SPM, endpoint
+`POST /auth/google` en la API, y el nombre de usuario editable una sola vez cuando lo
+puso Google. Probado en simulador y en dispositivo físico contra pre-producción.
+
+- **SDK y configuración**: dependencia remota `GoogleSignIn-iOS` añadida a mano al
+  `.pbxproj` (mismo patrón que la referencia local de `OmmadawnAPI`). `Info.plist`
+  propio (`ommadawn/Info.plist`) con `CFBundleURLTypes` (el `REVERSED_CLIENT_ID`),
+  fusionado con el Info.plist auto-generado vía `INFOPLIST_FILE` — hace falta una
+  **excepción de membresía** en el grupo sincronizado (`PBXFileSystemSynchronized
+  BuildFileExceptionSet`) para que ese fichero no se copie también como recurso (si
+  no, Xcode lo procesa dos veces y el build falla con "Multiple commands produce").
+  `Auth/GoogleAuthConfig.swift` centraliza los dos Client ID (iOS y Web/servidor).
+  `ommadawnApp.swift` configura `GIDSignIn.sharedInstance` al arrancar y añade
+  `.onOpenURL` para el callback del navegador embebido.
+- **Dos Client ID, un solo propósito**: el iOS Client ID identifica la app ante Google;
+  el Web Client ID se pasa como `serverClientID` en `GIDConfiguration` y es lo que la
+  API usa como audiencia (`aud`) al verificar el ID token — así, cuando llegue un
+  cliente Android, reutiliza la misma audiencia sin tocar la API.
+- **`AuthSession.signInWithGoogle(idToken:)`**: llama a `POST /auth/google`, guarda el
+  mismo `TokenPair` que `logIn`/`refresh` y sigue el mismo camino final — la sesión no
+  distingue después si vino de Google o de contraseña. `GoogleSignInError` mapea
+  401 (token inválido) / 403 (cuenta desactivada) / 409 (`email_conflict`) / 422.
+- **`LoginView`**: el botón "Continuar con Google" lanza `GIDSignIn.sharedInstance
+  .signIn(withPresenting:)`, saca el `idToken` del resultado y llama a
+  `signInWithGoogle`. Cancelar el flujo (`GIDSignInError.canceled`) no muestra error:
+  es una acción deliberada del usuario, no un fallo.
+- **Middleware de auth**: `google_login_api_v1_auth_google_post` tuvo que añadirse a
+  la lista de exclusión de `AuthMiddleware` (`OmmadawnAPI/Sources/OmmadawnAPI/
+  AuthMiddleware.swift`) — es un endpoint de login, no lleva `Bearer`, y sin la
+  exclusión el middleware fallaba con `notAuthenticated` antes de llegar a hacer la
+  petición (no había sesión previa de la que sacar un token).
+- **Conflicto de email**: si el email de Google ya existe en una cuenta con contraseña
+  sin Google vinculado, la API responde `409` con `detail: "email_conflict"` (código,
+  no frase) y la app lo traduce a "Ya tienes una cuenta con ese email. Entra con tu
+  contraseña y vincula Google desde tu perfil." Sin auto-vinculación ni crear duplicados.
+- **`GoogleMark.swift`** (`Shared/`): la "G" en degradado, reutilizable con tamaño
+  configurable — antes vivía duplicada dentro de `LoginView`, ahora también se usa en
+  el perfil.
+- **`has_google` en el perfil**: `UserRead` expone si la cuenta tiene Google vinculado.
+  `AccountProfileView` muestra "Usuario" y "Email" como filas bloqueadas (con 🔒) en
+  vez de mezcladas con los campos editables, y la "G" pequeña junto al email cuando
+  `has_google` es `true`.
+- **Username editable una sola vez**: al darse de alta por Google, la API genera un
+  username **aleatorio** (`user-1234`, no derivado del email) y marca
+  `username_is_default = true`. Mientras ese flag siga activo, `AccountProfileView`
+  muestra el campo "Usuario" como un `TextField` editable con una nota ("Google te
+  asignó este nombre. Puedes cambiarlo, pero solo una vez."); en cuanto se guarda un
+  cambio real, el servidor fija el username para siempre (`PATCH /auth/me` responde
+  `409` con `detail: "username_already_set"` en cualquier intento posterior — código
+  distinguible, no frase). La app solo manda `username` en el PATCH si de verdad
+  cambió respecto al valor cargado, para no gastar el único cambio por accidente al
+  guardar otro campo del formulario. **Cuentas creadas antes de este cambio** se
+  quedan con `username_is_default = false` (la migración no las marca retroactivamente
+  como editables) — es el comportamiento esperado, no un bug.
+
+### Backlog — Fase 4 (completa)
 
 Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 
@@ -168,20 +224,32 @@ contraseña): **error con sugerencia**, no auto-vinculación ni prompt de vincul
 propio login — es la opción más segura y sin fricción en el flujo feliz; la vinculación
 vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 
-| # | Mejora | Requiere API |
-|---|---|---|
-| 5.1 | **Google Sign-In — login/registro básico**: botón "Continuar con Google" en `LoginView` funcional (ver `googleSignInButton`, hoy solo placeholder). SDK `GoogleSignIn-iOS` obtiene el ID token; la app lo envía a la API. Si el email es nuevo, la API crea la cuenta; si ya existe vinculado a Google, hace login. | 🔴 API: `POST /auth/google` con `id_token` → verifica con Google, crea/loguea usuario, devuelve access+refresh igual que `/auth/login` |
-| 5.2 | **Conflicto de email**: si el ID token de Google trae un email que ya existe en una cuenta creada con contraseña (sin Google vinculado), la API responde con un código de error específico y la app muestra "Ya tienes una cuenta con ese email. Entra con tu contraseña y vincula Google desde tu perfil." (sin crear duplicados ni vincular a ciegas). | 🔴 API: `POST /auth/google` devuelve un código de error distinguible (ej. `409` + `email_conflict`) en vez de un 401/422 genérico |
-| 5.3 | **Vincular/desvincular Google desde el perfil**: en `AccountProfileView`, botón "Conectar con Google" (mismo flujo SDK, pero llama a un endpoint de vinculación en vez de login) y "Desconectar Google" — este último solo visible si el usuario tiene contraseña propia, para no dejar la cuenta sin forma de entrar. | 🔴 API: `POST /auth/me/google` (vincula, requiere sesión) + `DELETE /auth/me/google` (desvincula, rechaza si es el único método de acceso) |
-| 5.4 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
-| 5.5 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
-| 5.6 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
+| # | Mejora | Estado | Requiere API |
+|---|---|---|---|
+| 5.1 | **Google Sign-In — login/registro básico**: botón "Continuar con Google" funcional en `LoginView`. Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
+| 5.2 | **Conflicto de email**: email de Google ya existente con contraseña → `409 email_conflict`, mensaje con sugerencia, sin auto-vincular ni duplicar. | ✅ hecho (6 ago 2026) | ✅ |
+| 5.3 | **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" (mismo flujo SDK, llama a un endpoint de vinculación) y "Desconectar Google" — solo visible si el usuario tiene contraseña propia, para no dejar la cuenta sin forma de entrar. | Pendiente | 🔴 API: `POST /auth/me/google` (vincula, requiere sesión) + `DELETE /auth/me/google` (desvincula, rechaza si es el único método de acceso) |
+| 5.4 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | Pendiente | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
+| 5.5 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | Pendiente | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
+| 5.6 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | Pendiente | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
 
-> 5.1–5.3 (Google) son el frente activo de trabajo, en ese orden: primero login/registro
-> básico, luego el conflicto de email, luego la vinculación desde perfil — cada paso se
-> apoya en el anterior. 5.5 y 5.6 comparten infraestructura de email (proveedor SMTP o
-> servicio transaccional) y tiene sentido implementarlas juntas en el servidor cuando
-> llegue su turno.
+**Desglose de 5.1** (todo hecho el 6 ago 2026, ver también la sección "Login con Google" más arriba):
+
+| # | Subtarea | Dónde |
+|---|---|---|
+| 5.1.0 | Client ID OAuth en Google Cloud Console (iOS + Web/servidor) | Google Cloud Console |
+| 5.1.1 | `POST /auth/google`: verifica el ID token, crea/loguea, `409 email_conflict` | `ommadawn-api` |
+| 5.1.2 | SDK `GoogleSignIn-iOS` + `Info.plist` + configuración del SDK | app |
+| 5.1.3 | `AuthSession.signInWithGoogle(idToken:)` | app |
+| 5.1.4 | Botón "Continuar con Google" funcional en `LoginView` | app |
+| 5.1.5 | Manejo de errores (cancelado, sin red, conflicto, servidor) | app |
+| 5.1.6 | Probado en simulador y en dispositivo físico contra pre | app |
+| 5.1.7 | *(bonus, no estaba en el plan original)* `has_google` en el perfil + username editable una sola vez cuando lo asignó Google | app + API |
+
+> 5.3 (vinculación desde perfil) es el siguiente paso natural del frente de Google, apoyándose
+> en 5.1/5.2 ya cerrados. 5.5 y 5.6 comparten infraestructura de email (proveedor SMTP o
+> servicio transaccional) y tiene sentido implementarlas juntas en el servidor cuando llegue
+> su turno.
 
 ### Backlog — Fases futuras
 
@@ -381,12 +449,14 @@ movieron al engranaje de ajustes (botón derecho de la cabecera → `SettingsVie
 ommadawn/
 ├── ommadawn.xcodeproj/          # Proyecto Xcode (iOS: iPhone/iPad)
 ├── ommadawn/                    # Código de la app
-│   ├── ommadawnApp.swift        # @main · posee la AuthSession
+│   ├── ommadawnApp.swift        # @main · posee la AuthSession, configura GIDSignIn
+│   ├── Info.plist               # solo CFBundleURLTypes (login con Google); se fusiona con el auto-generado
 │   ├── ContentView.swift        # Vista raíz: enruta según el estado de sesión
 │   ├── RootTabView.swift        # Shell tras el login: cabecera común + TabView
 │   ├── LoginView.swift
 │   ├── Auth/
-│   │   ├── AuthSession.swift    # @Observable: sesión + perfil + avatar + logout
+│   │   ├── AuthSession.swift    # @Observable: sesión + perfil + avatar + logout + Google
+│   │   ├── GoogleAuthConfig.swift # Client ID iOS + Web/servidor (login con Google)
 │   │   └── RegisterView.swift
 │   ├── Account/
 │   │   ├── AccountMenu.swift          # Menú desplegable (nombre, apariencia, admin, logout)
@@ -408,6 +478,8 @@ ommadawn/
 │   ├── Shared/                   # Componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + NSLocale.isoCountryCodes + extraCodes
 │   │   ├── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
+│   │   ├── LabelPickerView.swift      # hoja de selección de sello discográfico
+│   │   ├── GoogleMark.swift           # la "G" en degradado (botón de login + icono en perfil)
 │   │   ├── MarkdownTextEditor.swift   # UITextView + MarkdownEditorController + MarkdownEditorSection
 │   │   └── MarkdownCheatsheetView.swift # referencia rápida de sintaxis Markdown
 │   ├── Design/
@@ -524,8 +596,8 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **1 — Esqueleto** | Proyecto Xcode iOS SwiftUI que arranca (plantilla). | ✅ Hecha |
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅, detalle de lectura completo con secciones desplegables y renderizado WKWebView ✅, botón de preview en editor Markdown ✅. Pendiente: 4.2 nombre de edición, 4.3 créditos por pista, 4.4 sello seleccionable. |
-| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, recuperación por email y verificación de correo al registrarse. | Pendiente |
+| **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
+| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, recuperación por email y verificación de correo al registrarse. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅. Pendiente: 5.3 vincular/desvincular desde perfil, 5.4 cambiar contraseña, 5.5 recuperar contraseña, 5.6 verificación de correo. |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

@@ -24,7 +24,7 @@ para esta app. Android queda para el futuro con otra base de código.
 - ✅ **Fase 3 — Autenticación**: registro, login, tokens en Keychain, renovación
   automática (reactiva ante `401` y proactiva con `expires_in`) y logout.
 - ✅ **Identidad visual**: logo, wordmark e icono propios.
-- 🚧 **Fase 4 — Discografía**: listado (grid/lista, filtro, orden) y detalle con
+- ✅ **Fase 4 — Discografía**: listado (grid/lista, filtro, orden) y detalle con
   tracklist; cabecera con avatar a la izquierda y engranaje de ajustes a la derecha
   (solo visible a admins); perfil de usuario editable con avatar y selector de país con
   bandera; ajustes de apariencia sincronizados con el servidor (en el menú de cuenta);
@@ -39,7 +39,12 @@ para esta app. Android queda para el futuro con otra base de código.
   Publicación con fecha completa, Formato, Cat.); botón de preview (👁) en el editor Markdown
   para ver el resultado renderizado sin salir del formulario; edición directa de grabaciones
   vinculadas (🔗 cápsula + ✕ para desvincular), borrado automático de grabaciones huérfanas
-  al quitar un track, e indicador de uso en el buscador de grabaciones.
+  al quitar un track, indicador de uso en el buscador de grabaciones, y sello discográfico
+  seleccionable de una tabla (crear/eliminar).
+- 🚧 **Fase 5 — Mejoras de autenticación**: login con Google (SDK oficial, conflicto de
+  email con sugerencia, sin auto-vincular), nombre de usuario editable una sola vez
+  cuando lo asigna Google. Pendiente: vincular/desvincular Google desde el perfil,
+  cambio y recuperación de contraseña, verificación de correo.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -205,8 +210,16 @@ Cómo está montado:
 - **Logout instantáneo**: cierra en local primero (sin esperar a la red) y revoca en el
   servidor en segundo plano.
 - Login por **usuario _o_ email** (campo `username_or_email`).
+- **Login con Google**: SDK oficial `GoogleSignIn-iOS`. La app solo obtiene el ID token
+  de Google; se lo pasa a la API (`POST /auth/google`), que lo verifica y devuelve el
+  mismo par access/refresh que el login por contraseña — a partir de ahí no hay ninguna
+  diferencia entre una sesión u otra. Conflicto de email (alguien entra con Google usando
+  un email que ya tiene cuenta con contraseña) responde `409` con un código distinguible
+  y la app lo traduce en un mensaje con sugerencia, sin auto-vincular ni duplicar cuentas.
+  Al darse de alta por Google, el username se genera al azar (`user-1234`) y se puede
+  editar **una sola vez** desde el perfil — después queda fijo, igual que cualquier otro.
 
-Endpoints de auth: `register`, `login`, `refresh`, `logout`, `me` (`GET`/`PATCH`),
+Endpoints de auth: `register`, `login`, `refresh`, `logout`, `google`, `me` (`GET`/`PATCH`),
 `me/avatar` (`POST`/`DELETE`), `users` (`GET`, superadmin), `users/{id}` (`PATCH`,
 superadmin).
 
@@ -221,10 +234,13 @@ derecha** (abre `SettingsView`). Desde ahí:
 - **AccountMenu**: solo "Editar perfil" y "Cerrar sesión". Las opciones de apariencia y
   administración se movieron a Ajustes.
 - **Perfil** (`AccountProfileView`): avatar (`PhotosPicker` para subir/cambiar, o
-  quitarlo) y datos — `username` no editable (primera fila) y campos editables con
-  etiqueta visible (nombre, país, ciudad, fecha de nacimiento) — vía `PATCH /auth/me`.
-  Un campo se puede rellenar pero no vaciar desde aquí todavía (el PATCH de la API es
-  parcial: un campo ausente no se toca).
+  quitarlo) y datos — `username` y email como filas bloqueadas (con 🔒), con la "G" de
+  Google junto al email si la cuenta la tiene vinculada; campos editables con etiqueta
+  visible (nombre, país, ciudad, fecha de nacimiento) — vía `PATCH /auth/me`. Un campo
+  se puede rellenar pero no vaciar desde aquí todavía (el PATCH de la API es parcial: un
+  campo ausente no se toca). **Excepción**: si el username es el generado al azar de un
+  alta por Google (`username_is_default`), la fila pasa a ser un campo editable con una
+  nota — se puede cambiar una única vez, después queda fijo igual que el resto.
 - **Ajustes** (`SettingsView`): selector de apariencia (Sistema/Claro/Oscuro)
   sincronizado con `theme_preference` del servidor — al guardar se hace `PATCH /auth/me`
   y al restaurar sesión se aplica la preferencia del servidor. Solo superadmins ven
@@ -310,8 +326,8 @@ API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos. | 🚧 En marcha — lectura ✅, cabecera ✅, perfil ✅, ajustes ✅, admins ✅, edición completa del catálogo ✅, edición directa de grabaciones ✅, indicador de uso en buscador ✅, nombre de edición ✅, créditos por pista ✅, sello seleccionable ✅; sin pendientes conocidos |
-| **5 — Mejoras de autenticación** | Cambio de contraseña, recuperación por email, verificación de correo. | Pendiente |
+| **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
+| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, recuperación por email, verificación de correo. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez) ✅; pendiente: vincular/desvincular desde perfil, cambio y recuperación de contraseña, verificación de correo |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

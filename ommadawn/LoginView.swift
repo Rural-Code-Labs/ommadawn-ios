@@ -16,6 +16,7 @@
 
 import SwiftUI
 import OmmadawnAPI
+import GoogleSignIn
 
 struct LoginView: View {
     @Environment(AuthSession.self) private var session
@@ -32,11 +33,6 @@ struct LoginView: View {
     @State private var errorMessage: String?
     /// Controla la presentación de la hoja de registro.
     @State private var showingRegister = false
-    /// El botón de Google es solo un hueco visual todavía: falta el endpoint
-    /// en la API (verificar el ID token de Google y emitir los tokens propios
-    /// — ver LoginError/RegisterError para el patrón que seguiría una vez
-    /// exista).
-    @State private var showingGoogleComingSoon = false
     /// Controla la presentación del panel "Acerca de".
     @State private var showingAbout = false
     @State private var showingEnvironmentPicker = false
@@ -232,14 +228,13 @@ struct LoginView: View {
     }
 
     /// Blanco con la "G" a color (sin reproducir el logotipo exacto, solo su
-    /// paleta). Todavía no hace nada: falta el endpoint en la API para
-    /// verificar el ID token de Google y emitir los tokens propios.
+    /// paleta).
     private var googleSignInButton: some View {
         Button {
-            showingGoogleComingSoon = true
+            Task { await submitWithGoogle() }
         } label: {
             HStack(spacing: 10) {
-                googleG
+                GoogleMark()
                 Text("Continuar con Google")
                     .fontWeight(.medium)
             }
@@ -252,21 +247,6 @@ struct LoginView: View {
             }
         }
         .buttonStyle(.plain)
-        .alert("Próximamente", isPresented: $showingGoogleComingSoon) {
-            Button("Vale", role: .cancel) {}
-        } message: {
-            Text("El inicio de sesión con Google todavía no está disponible.")
-        }
-    }
-
-    /// La "G" de Google en degradado con sus cuatro colores de marca — un
-    /// guiño a la paleta, no una copia del logotipo real.
-    private var googleG: some View {
-        Text("G")
-            .font(.system(size: 20, weight: .bold))
-            .foregroundStyle(
-                AngularGradient(colors: [.red, .yellow, .green, .blue, .red], center: .center)
-            )
     }
 
     private var registerLink: some View {
@@ -345,6 +325,60 @@ struct LoginView: View {
         case .network:
             "No se pudo conectar. Comprueba tu conexión."
         }
+    }
+
+    /// Lanza el SDK de Google, obtiene el ID token y se lo pasa a
+    /// `AuthSession`. Si el usuario cancela el flujo (cierra la hoja de
+    /// Google), no se muestra ningún error — es una acción deliberada, no un
+    /// fallo.
+    private func submitWithGoogle() async {
+        guard !isSubmitting, let presenter = topViewController() else { return }
+        errorMessage = nil
+        isSubmitting = true
+        defer { isSubmitting = false }
+
+        do {
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenter)
+            guard let idToken = result.user.idToken?.tokenString else {
+                errorMessage = "Google no devolvió un token válido. Inténtalo de nuevo."
+                return
+            }
+            try await session.signInWithGoogle(idToken: idToken)
+        } catch let error as GoogleSignInError {
+            errorMessage = message(for: error)
+        } catch GIDSignInError.canceled {
+            // Usuario canceló el flujo de Google: no es un error que mostrar.
+        } catch {
+            errorMessage = "No se pudo iniciar sesión con Google. Inténtalo de nuevo."
+        }
+    }
+
+    /// Traduce el error de `signInWithGoogle` a un texto para la pantalla.
+    private func message(for error: GoogleSignInError) -> String {
+        switch error {
+        case .invalidToken:
+            "Google no pudo confirmar tu identidad. Inténtalo de nuevo."
+        case .accountDisabled:
+            "Tu cuenta está desactivada."
+        case .emailConflict:
+            "Ya tienes una cuenta con ese email. Entra con tu contraseña y vincula Google desde tu perfil."
+        case .invalidData:
+            "Revisa los datos introducidos."
+        case .unexpected(let statusCode):
+            "Error del servidor (\(statusCode)). Inténtalo más tarde."
+        case .network:
+            "No se pudo conectar. Comprueba tu conexión."
+        }
+    }
+
+    /// El SDK de Google necesita un `UIViewController` sobre el que presentar
+    /// su navegador embebido — SwiftUI no expone uno directamente.
+    private func topViewController() -> UIViewController? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow)?
+            .rootViewController
     }
 }
 

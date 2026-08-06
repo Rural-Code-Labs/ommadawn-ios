@@ -142,8 +142,10 @@ struct AdminUsersView: View {
         .environment(AuthSession(initialState: .signedIn(User(
             id: 1,
             username: "discotest2",
+            username_is_default: false,
             email: "discotest2@example.com",
             theme_preference: .system,
+            has_google: false,
             is_active: true,
             is_admin: true,
             is_super_admin: true,

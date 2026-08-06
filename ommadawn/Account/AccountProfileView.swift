@@ -26,6 +26,7 @@ struct AccountProfileView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var hasLoadedForm = false
+    @State private var username = ""
     @State private var fullName = ""
     @State private var countryCode: String?
     @State private var showingCountryPicker = false
@@ -52,8 +53,12 @@ struct AccountProfileView: View {
 
                 Section("Datos") {
                     if let user {
-                        LabeledContent("Usuario", value: user.username)
-                            .foregroundStyle(.primary)
+                        if user.username_is_default {
+                            editableUsernameField
+                        } else {
+                            lockedField(label: "Usuario", value: user.username)
+                        }
+                        lockedField(label: "Email", value: user.email, showsGoogleMark: user.has_google)
                     }
                     LabeledContent("Nombre completo") {
                         TextField("", text: $fullName)
@@ -107,6 +112,7 @@ struct AccountProfileView: View {
             .disabled(isSaving)
             .task {
                 guard !hasLoadedForm, let user else { return }
+                username = user.username
                 fullName = user.full_name ?? ""
                 countryCode = user.country
                 city = user.city ?? ""
@@ -117,6 +123,47 @@ struct AccountProfileView: View {
                 hasLoadedForm = true
             }
         }
+    }
+
+    // MARK: - Campos
+
+    /// Nombre de usuario editable — solo aparece cuando la cuenta todavía
+    /// tiene el username provisional que le puso el alta por Google
+    /// (`username_is_default`). Es un cambio de un solo uso: en cuanto se
+    /// guarda, el servidor lo fija para siempre y esta fila deja de salir.
+    private var editableUsernameField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            LabeledContent("Usuario") {
+                TextField("", text: $username)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+            Text("Google te asignó este nombre. Puedes cambiarlo, pero solo una vez.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Fila de solo lectura, con un candado que la distingue a simple vista
+    /// de los campos editables de al lado. Usuario y email no se pueden
+    /// tocar desde aquí (no hay endpoint para cambiarlos en este formulario).
+    ///
+    /// - Parameter showsGoogleMark: si la cuenta tiene Google vinculado, se
+    ///   añade la "G" junto al valor — de momento solo informativo, la
+    ///   vinculación/desvinculación desde aquí llega en una tarea futura.
+    private func lockedField(label: String, value: String, showsGoogleMark: Bool = false) -> some View {
+        LabeledContent(label) {
+            HStack(spacing: 6) {
+                if showsGoogleMark {
+                    GoogleMark(size: 13)
+                }
+                Text(value)
+                Image(systemName: "lock.fill")
+                    .font(.caption2)
+            }
+        }
+        .foregroundStyle(.secondary)
     }
 
     // MARK: - Avatar
@@ -199,9 +246,15 @@ struct AccountProfileView: View {
 
         let trimmedName = fullName.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedCity = city.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Solo se manda si de verdad se ha tocado: mandarlo sin cambios
+        // gastaría igualmente el único cambio permitido en el servidor.
+        let usernameToSend = (user?.username_is_default == true && !trimmedUsername.isEmpty && trimmedUsername != user?.username)
+            ? trimmedUsername : nil
 
         do {
             try await session.updateProfile(
+                username: usernameToSend,
                 fullName: trimmedName.isEmpty ? nil : trimmedName,
                 country: countryCode,
                 city: trimmedCity.isEmpty ? nil : trimmedCity,
@@ -223,6 +276,10 @@ struct AccountProfileView: View {
             "Revisa los datos introducidos."
         case .imageTooLarge:
             "La imagen supera el tamaño máximo permitido (10 MB)."
+        case .usernameTaken:
+            "Ese nombre de usuario ya está en uso. Prueba con otro."
+        case .usernameLocked:
+            "Ya has elegido tu nombre de usuario definitivo."
         case .sessionExpired:
             "Tu sesión ha caducado. Vuelve a iniciar sesión."
         case .unexpected(let statusCode):
@@ -270,10 +327,12 @@ struct AccountProfileView: View {
     AccountProfileView()
         .environment(AuthSession(initialState: .signedIn(User(
             id: 1,
-            username: "rafatest",
+            username: "user-4821",
+            username_is_default: true,
             email: "rafa@example.com",
             full_name: "Rafa García",
             theme_preference: .system,
+            has_google: true,
             is_active: true,
             is_admin: false,
             is_super_admin: false,

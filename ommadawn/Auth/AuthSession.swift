@@ -26,6 +26,19 @@ enum LoginError: Error {
     case network(Error)       // sin conexión / fallo de transporte
 }
 
+/// Motivos por los que un login con Google puede fallar.
+///
+/// No incluye "cancelado por el usuario": eso ocurre en el SDK de Google antes
+/// de llegar a llamar a este método, no es un error de la API.
+enum GoogleSignInError: Error {
+    case invalidToken     // 401 — el ID token de Google no es válido (firma, caducidad, audiencia)
+    case accountDisabled  // 403 — cuenta desactivada
+    case emailConflict    // 409 — el email ya existe con contraseña, sin Google vinculado
+    case invalidData      // 422 — no debería pasar si el SDK nos da un id_token bien formado
+    case unexpected(Int)
+    case network(Error)
+}
+
 /// Motivos por los que un registro puede fallar.
 enum RegisterError: Error {
     case alreadyTaken             // 409 — usuario o email ya en uso
@@ -39,6 +52,8 @@ enum RegisterError: Error {
 enum ProfileError: Error {
     case invalidData      // 422 — datos rechazados o formato de imagen no soportado
     case imageTooLarge    // 413 — avatar por encima de 10 MB
+    case usernameTaken    // 409 — al editar username: ya lo tiene otra cuenta
+    case usernameLocked   // 409 — al editar username: ya se gastó el único cambio permitido
     case sessionExpired   // 401
     case unexpected(Int)
     case network(Error)
@@ -154,6 +169,46 @@ final class AuthSession {
         }
     }
 
+    /// Inicia sesión (o registra, si el email es nuevo) con el ID token que ya
+    /// ha obtenido el SDK de Google en el cliente.
+    ///
+    /// La API verifica el token contra Google y devuelve el mismo par de
+    /// tokens que `logIn` — a partir de ahí no hay diferencia entre una
+    /// sesión que empezó con contraseña o con Google.
+    ///
+    /// - Throws: siempre un `GoogleSignInError`, listo para que la pantalla lo pinte.
+    func signInWithGoogle(idToken: String) async throws {
+        do {
+            let output = try await client.google_login_api_v1_auth_google_post(
+                .init(body: .json(.init(id_token: idToken)))
+            )
+
+            switch output {
+            case .ok(let ok):
+                let pair = try ok.body.json
+                try await tokenStore.save(AuthTokens(pair: pair))
+                let user = try await fetchProfile()
+                applyTheme(from: user)
+                state = .signedIn(user)
+
+            case .unauthorized:
+                throw GoogleSignInError.invalidToken
+            case .forbidden:
+                throw GoogleSignInError.accountDisabled
+            case .conflict:
+                throw GoogleSignInError.emailConflict
+            case .unprocessableContent:
+                throw GoogleSignInError.invalidData
+            case .undocumented(let statusCode, _):
+                throw GoogleSignInError.unexpected(statusCode)
+            }
+        } catch let error as GoogleSignInError {
+            throw error
+        } catch {
+            throw GoogleSignInError.network(error)
+        }
+    }
+
     /// Registra un usuario nuevo y, si va bien, inicia sesión automáticamente.
     ///
     /// El endpoint de registro no devuelve tokens (solo el usuario creado), así
@@ -188,8 +243,14 @@ final class AuthSession {
     }
 
     /// Edita los campos de perfil presentes (`nil` = no tocar ese campo; PATCH
-    /// real, igual que en discografía). No toca username/email/contraseña/avatar.
+    /// real, igual que en discografía). No toca email/contraseña/avatar.
+    ///
+    /// `username` es un caso especial: el servidor solo lo acepta si la
+    /// cuenta todavía tiene el username provisional de un alta por Google
+    /// (`username_is_default == true`, ver `User+Presentation.swift`); si no,
+    /// responde `409` y aquí se traduce en `ProfileError.usernameLocked`.
     func updateProfile(
+        username: String? = nil,
         fullName: String? = nil,
         country: String? = nil,
         city: String? = nil,
@@ -199,6 +260,7 @@ final class AuthSession {
         do {
             let output = try await client.update_me_api_v1_auth_me_patch(
                 .init(body: .json(.init(
+                    username: username,
                     full_name: fullName,
                     country: country,
                     city: city,
@@ -213,6 +275,9 @@ final class AuthSession {
                 state = .signedIn(user)
             case .unauthorized:
                 throw ProfileError.sessionExpired
+            case .conflict(let conflict):
+                let detail = (try? conflict.body.json.detail) ?? ""
+                throw detail == "username_already_set" ? ProfileError.usernameLocked : ProfileError.usernameTaken
             case .unprocessableContent:
                 throw ProfileError.invalidData
             case .undocumented(let statusCode, _):

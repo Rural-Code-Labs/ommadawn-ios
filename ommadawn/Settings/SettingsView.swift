@@ -84,8 +84,10 @@ struct SettingsView: View {
     SettingsView(user: User(
         id: 1,
         username: "rafatest",
+        username_is_default: false,
         email: "rafa@example.com",
         theme_preference: .system,
+        has_google: false,
         is_active: true,
         is_admin: true,
         is_super_admin: true,
