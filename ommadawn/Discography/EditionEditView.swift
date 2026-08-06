@@ -494,7 +494,7 @@ struct EditionEditView: View {
 
             // 3. Intentar borrar grabaciones que quedaron huérfanas (best-effort)
             for rid in pendingDeleteRecordingIDs {
-                try? await store.deleteRecording(id: rid)
+                _ = try? await store.deleteRecording(id: rid)
             }
 
             onSave(saved)
