@@ -43,8 +43,9 @@ con otra base de código.
   completa: listado con grid/lista/filtro/orden, detalle con tracklist, cabecera común de
   la app, perfil de usuario editable con avatar, gestión de administradores, edición
   completa del catálogo para admins, sello seleccionable) y **Fase 5 en marcha** (login con
-  Google: alta/login básico, conflicto de email, y nombre de usuario editable una sola vez
-  cuando lo asignó Google — ver más abajo). Ver plan abajo.
+  Google: alta/login básico, conflicto de email, nombre de usuario editable una sola vez
+  cuando lo asignó Google, y vincular/desvincular Google desde el perfil — ver más abajo).
+  Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
 - **Edición de catálogo para admins (Fase 4, hecha en 3 capas, 30 jul 2026)**:
@@ -146,9 +147,10 @@ con otra base de código.
 
 ## Login con Google (Fase 5, 6 ago 2026)
 
-Implementado de punta a punta: SDK oficial `GoogleSignIn-iOS` 9.2.0 vía SPM, endpoint
-`POST /auth/google` en la API, y el nombre de usuario editable una sola vez cuando lo
-puso Google. Probado en simulador y en dispositivo físico contra pre-producción.
+Implementado de punta a punta: SDK oficial `GoogleSignIn-iOS` 9.2.0 vía SPM, endpoints
+`POST /auth/google` (login/alta) y `POST`/`DELETE /auth/me/google` (vincular/desvincular
+desde el perfil) en la API, nombre de usuario editable una sola vez cuando lo puso
+Google. Probado en simulador y en dispositivo físico contra pre-producción.
 
 - **SDK y configuración**: dependencia remota `GoogleSignIn-iOS` añadida a mano al
   `.pbxproj` (mismo patrón que la referencia local de `OmmadawnAPI`). `Info.plist`
@@ -200,6 +202,28 @@ puso Google. Probado en simulador y en dispositivo físico contra pre-producció
   guardar otro campo del formulario. **Cuentas creadas antes de este cambio** se
   quedan con `username_is_default = false` (la migración no las marca retroactivamente
   como editables) — es el comportamiento esperado, no un bug.
+- **Vincular/desvincular Google desde el perfil**: nueva sección "Cuenta de Google" en
+  `AccountProfileView` — "Conectar con Google" (mismo flujo `GIDSignIn` que el login,
+  pero llama a `AuthSession.linkGoogleAccount(idToken:)` → `POST /auth/me/google`,
+  autenticado, no es un login) o "Desconectar Google" (`confirmationDialog` de aviso →
+  `AuthSession.unlinkGoogleAccount()` → `DELETE /auth/me/google`).
+  - **Sin campo "tiene contraseña" en el contrato**: `UserRead` no expone si la cuenta
+    tiene `hashed_password`, así que "Desconectar Google" se muestra siempre que
+    `has_google` sea `true`, sin ocultarlo de antemano. Si Google es la única forma de
+    entrar, el servidor rechaza con `409` (`detail: "google_only_access"`) y la app
+    traduce eso en un mensaje explicando por qué, en vez de pedir un campo nuevo a la
+    API solo para prevenir un caso que el error ya cubre igual de bien.
+  - **`google_already_linked`** (409 al vincular): esa cuenta de Google ya pertenece a
+    otro usuario — no se puede compartir una misma cuenta de Google entre dos usuarios.
+  - **Errores como `alert`, no como texto en la sección**: la primera versión ponía el
+    mensaje de error como `Text` dentro de la `Section` "Cuenta de Google", pero si el
+    botón queda arriba y el usuario no hace scroll tras pulsarlo, ese texto no se ve —
+    parece que la acción no hizo nada. Se cambió a `.alert` (modal, centrado, no
+    depende de la posición de scroll) con un `Binding` derivado de
+    `googleErrorMessage != nil`.
+  - `UIApplication.topViewController` se extrajo a `Shared/UIApplication+
+    TopViewController.swift`: lo necesitan tanto `LoginView` (login) como
+    `AccountProfileView` (vinculación) para presentar el navegador embebido del SDK.
 
 ### Backlog — Fase 4 (completa)
 
@@ -228,7 +252,7 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 |---|---|---|---|
 | 5.1 | **Google Sign-In — login/registro básico**: botón "Continuar con Google" funcional en `LoginView`. Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.2 | **Conflicto de email**: email de Google ya existente con contraseña → `409 email_conflict`, mensaje con sugerencia, sin auto-vincular ni duplicar. | ✅ hecho (6 ago 2026) | ✅ |
-| 5.3 | **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" (mismo flujo SDK, llama a un endpoint de vinculación) y "Desconectar Google" — solo visible si el usuario tiene contraseña propia, para no dejar la cuenta sin forma de entrar. | Pendiente | 🔴 API: `POST /auth/me/google` (vincula, requiere sesión) + `DELETE /auth/me/google` (desvincula, rechaza si es el único método de acceso) |
+| 5.3 | **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" (mismo flujo SDK, llama a un endpoint de vinculación) y "Desconectar Google". Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.4 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | Pendiente | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
 | 5.5 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | Pendiente | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
 | 5.6 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | Pendiente | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
@@ -246,10 +270,19 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 | 5.1.6 | Probado en simulador y en dispositivo físico contra pre | app |
 | 5.1.7 | *(bonus, no estaba en el plan original)* `has_google` en el perfil + username editable una sola vez cuando lo asignó Google | app + API |
 
-> 5.3 (vinculación desde perfil) es el siguiente paso natural del frente de Google, apoyándose
-> en 5.1/5.2 ya cerrados. 5.5 y 5.6 comparten infraestructura de email (proveedor SMTP o
-> servicio transaccional) y tiene sentido implementarlas juntas en el servidor cuando llegue
-> su turno.
+**Desglose de 5.3** (todo hecho el 6 ago 2026):
+
+| # | Subtarea | Dónde |
+|---|---|---|
+| 5.3.1 | `POST`/`DELETE /auth/me/google`: vincula (rechaza si el `google_id` ya es de otro usuario) / desvincula (rechaza si no hay contraseña propia) | `ommadawn-api` |
+| 5.3.2 | `AuthSession.linkGoogleAccount(idToken:)` + botón "Conectar con Google" | app |
+| 5.3.3 | `AuthSession.unlinkGoogleAccount()` + botón "Desconectar Google" con `confirmationDialog` | app |
+| 5.3.4 | Manejo de errores (`google_already_linked`, `google_only_access`, cancelado, servidor) como `.alert` en vez de texto en la sección | app |
+| 5.3.5 | Probado en simulador | app |
+
+> 5.5 y 5.6 comparten infraestructura de email (proveedor SMTP o servicio transaccional) y
+> tiene sentido implementarlas juntas en el servidor cuando llegue su turno. 5.4 (cambiar
+> contraseña) puede ir antes o después, es independiente de esa infraestructura.
 
 ### Backlog — Fases futuras
 
@@ -480,6 +513,7 @@ ommadawn/
 │   │   ├── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
 │   │   ├── LabelPickerView.swift      # hoja de selección de sello discográfico
 │   │   ├── GoogleMark.swift           # la "G" en degradado (botón de login + icono en perfil)
+│   │   ├── UIApplication+TopViewController.swift # presentar el navegador embebido del SDK de Google
 │   │   ├── MarkdownTextEditor.swift   # UITextView + MarkdownEditorController + MarkdownEditorSection
 │   │   └── MarkdownCheatsheetView.swift # referencia rápida de sintaxis Markdown
 │   ├── Design/
@@ -597,7 +631,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, recuperación por email y verificación de correo al registrarse. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅. Pendiente: 5.3 vincular/desvincular desde perfil, 5.4 cambiar contraseña, 5.5 recuperar contraseña, 5.6 verificación de correo. |
+| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, recuperación por email y verificación de correo al registrarse. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅, 5.3 vincular/desvincular desde perfil ✅. Pendiente: 5.4 cambiar contraseña, 5.5 recuperar contraseña, 5.6 verificación de correo. |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

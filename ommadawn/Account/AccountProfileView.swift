@@ -20,6 +20,7 @@
 import SwiftUI
 import PhotosUI
 import OmmadawnAPI
+import GoogleSignIn
 
 struct AccountProfileView: View {
     @Environment(AuthSession.self) private var session
@@ -37,7 +38,14 @@ struct AccountProfileView: View {
     @State private var photoPickerItem: PhotosPickerItem?
     @State private var isUploadingAvatar = false
     @State private var isSaving = false
+    @State private var isLinkingGoogle = false
+    @State private var showingUnlinkConfirmation = false
     @State private var errorMessage: String?
+    /// Separado del `errorMessage` general: ese vive en su propia `Section`
+    /// al final del formulario, demasiado lejos del botón de Google — un
+    /// error ahí parece que el formulario entero falló, no que Google en
+    /// concreto rechazó la acción. Este se pinta pegado a la sección.
+    @State private var googleErrorMessage: String?
 
     private var user: User? {
         guard case .signedIn(let user) = session.state else { return nil }
@@ -88,6 +96,10 @@ struct AccountProfileView: View {
                     }
                 }
 
+                if let user {
+                    googleAccountSection(for: user)
+                }
+
                 if let errorMessage {
                     Section {
                         Text(errorMessage)
@@ -109,7 +121,7 @@ struct AccountProfileView: View {
                     }
                 }
             }
-            .disabled(isSaving)
+            .disabled(isSaving || isLinkingGoogle)
             .task {
                 guard !hasLoadedForm, let user else { return }
                 username = user.username
@@ -237,6 +249,97 @@ struct AccountProfileView: View {
         }
     }
 
+    // MARK: - Cuenta de Google
+
+    /// Vincular o desvincular Google. La API no expone si la cuenta tiene
+    /// contraseña propia, así que "Desconectar Google" se muestra siempre
+    /// que `has_google` sea `true` — si Google fuera la única forma de
+    /// entrar, el servidor rechaza con `409` y el mensaje se lo explica a
+    /// la persona en vez de adivinarlo de antemano.
+    private func googleAccountSection(for user: User) -> some View {
+        Section("Cuenta de Google") {
+            if user.has_google {
+                Button("Desconectar Google", role: .destructive) {
+                    showingUnlinkConfirmation = true
+                }
+                .disabled(isLinkingGoogle)
+            } else {
+                Button {
+                    Task { await linkGoogle() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if isLinkingGoogle {
+                            ProgressView()
+                        } else {
+                            GoogleMark(size: 16)
+                        }
+                        Text("Conectar con Google")
+                    }
+                }
+                .disabled(isLinkingGoogle)
+            }
+        }
+        .confirmationDialog(
+            "¿Desconectar Google?",
+            isPresented: $showingUnlinkConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Desconectar", role: .destructive) { Task { await unlinkGoogle() } }
+        } message: {
+            Text("Ya no podrás entrar con tu cuenta de Google. Seguirás pudiendo entrar con tu usuario y contraseña.")
+        }
+        // Alert, no texto en la sección: si el botón queda fuera de la
+        // pantalla visible al pulsarlo, un texto pegado a la sección puede
+        // no llegar a verse sin hacer scroll. El alert sale centrado pase
+        // lo que pase.
+        .alert(
+            "Aviso",
+            isPresented: Binding(
+                get: { googleErrorMessage != nil },
+                set: { if !$0 { googleErrorMessage = nil } }
+            )
+        ) {
+            Button("Vale", role: .cancel) {}
+        } message: {
+            Text(googleErrorMessage ?? "")
+        }
+    }
+
+    private func linkGoogle() async {
+        guard !isLinkingGoogle, let presenter = UIApplication.shared.topViewController else { return }
+        googleErrorMessage = nil
+        isLinkingGoogle = true
+        defer { isLinkingGoogle = false }
+
+        do {
+            let result = try await GIDSignIn.sharedInstance.signIn(withPresenting: presenter)
+            guard let idToken = result.user.idToken?.tokenString else {
+                googleErrorMessage = "Google no devolvió un token válido. Inténtalo de nuevo."
+                return
+            }
+            try await session.linkGoogleAccount(idToken: idToken)
+        } catch let error as ProfileError {
+            googleErrorMessage = message(for: error)
+        } catch GIDSignInError.canceled {
+            // Cancelado por el usuario: no es un error que mostrar.
+        } catch {
+            googleErrorMessage = "No se pudo conectar con Google. Inténtalo de nuevo."
+        }
+    }
+
+    private func unlinkGoogle() async {
+        googleErrorMessage = nil
+        isLinkingGoogle = true
+        defer { isLinkingGoogle = false }
+        do {
+            try await session.unlinkGoogleAccount()
+        } catch let error as ProfileError {
+            googleErrorMessage = message(for: error)
+        } catch {
+            googleErrorMessage = "No se pudo desconectar Google. Inténtalo de nuevo."
+        }
+    }
+
     // MARK: - Perfil
 
     private func saveProfile() async {
@@ -280,6 +383,10 @@ struct AccountProfileView: View {
             "Ese nombre de usuario ya está en uso. Prueba con otro."
         case .usernameLocked:
             "Ya has elegido tu nombre de usuario definitivo."
+        case .googleAlreadyLinked:
+            "Esa cuenta de Google ya está vinculada a otro usuario."
+        case .googleOnlyAccess:
+            "Google es tu única forma de entrar. Para desvincularlo, primero pon una contraseña."
         case .sessionExpired:
             "Tu sesión ha caducado. Vuelve a iniciar sesión."
         case .unexpected(let statusCode):

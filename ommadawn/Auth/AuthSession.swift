@@ -50,11 +50,13 @@ enum RegisterError: Error {
 
 /// Motivos por los que editar el perfil o el avatar puede fallar.
 enum ProfileError: Error {
-    case invalidData      // 422 — datos rechazados o formato de imagen no soportado
-    case imageTooLarge    // 413 — avatar por encima de 10 MB
-    case usernameTaken    // 409 — al editar username: ya lo tiene otra cuenta
-    case usernameLocked   // 409 — al editar username: ya se gastó el único cambio permitido
-    case sessionExpired   // 401
+    case invalidData        // 422 — datos rechazados o formato de imagen no soportado
+    case imageTooLarge      // 413 — avatar por encima de 10 MB
+    case usernameTaken      // 409 — al editar username: ya lo tiene otra cuenta
+    case usernameLocked     // 409 — al editar username: ya se gastó el único cambio permitido
+    case googleAlreadyLinked // 409 — al vincular: ese Google ya pertenece a otra cuenta
+    case googleOnlyAccess    // 409 — al desvincular: Google es la única forma de entrar
+    case sessionExpired     // 401
     case unexpected(Int)
     case network(Error)
 }
@@ -206,6 +208,57 @@ final class AuthSession {
             throw error
         } catch {
             throw GoogleSignInError.network(error)
+        }
+    }
+
+    /// Vincula una cuenta de Google al usuario **ya autenticado** (no es un
+    /// login: el ID token solo aporta el `google_id`, la identidad viene de
+    /// la sesión). No toca email ni username.
+    func linkGoogleAccount(idToken: String) async throws {
+        do {
+            let output = try await client.link_google_account_api_v1_auth_me_google_post(
+                .init(body: .json(.init(id_token: idToken)))
+            )
+            switch output {
+            case .ok(let ok):
+                state = .signedIn(try ok.body.json)
+            case .unauthorized:
+                throw ProfileError.sessionExpired
+            case .conflict:
+                throw ProfileError.googleAlreadyLinked
+            case .unprocessableContent:
+                throw ProfileError.invalidData
+            case .undocumented(let statusCode, _):
+                throw ProfileError.unexpected(statusCode)
+            }
+        } catch let error as ProfileError {
+            throw error
+        } catch {
+            throw ProfileError.network(error)
+        }
+    }
+
+    /// Desvincula Google del usuario autenticado. El servidor rechaza si es
+    /// la única forma de acceso (sin contraseña) — la app ya oculta el botón
+    /// en ese caso, pero el error queda cubierto por si algo cambió entre
+    /// medias (otra sesión, etc.).
+    func unlinkGoogleAccount() async throws {
+        do {
+            let output = try await client.unlink_google_account_api_v1_auth_me_google_delete(.init())
+            switch output {
+            case .ok(let ok):
+                state = .signedIn(try ok.body.json)
+            case .unauthorized:
+                throw ProfileError.sessionExpired
+            case .conflict:
+                throw ProfileError.googleOnlyAccess
+            case .undocumented(let statusCode, _):
+                throw ProfileError.unexpected(statusCode)
+            }
+        } catch let error as ProfileError {
+            throw error
+        } catch {
+            throw ProfileError.network(error)
         }
     }
 

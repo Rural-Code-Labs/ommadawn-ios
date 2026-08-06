@@ -218,10 +218,18 @@ Cómo está montado:
   y la app lo traduce en un mensaje con sugerencia, sin auto-vincular ni duplicar cuentas.
   Al darse de alta por Google, el username se genera al azar (`user-1234`) y se puede
   editar **una sola vez** desde el perfil — después queda fijo, igual que cualquier otro.
+- **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" o
+  "Desconectar Google" en `AccountProfileView` (`POST`/`DELETE /auth/me/google`,
+  autenticado). No se puede vincular una cuenta de Google ya enlazada a otro usuario
+  (`409`), ni desvincular si es la única forma de entrar (`409`) — la app no oculta el
+  botón de antemano (el contrato no expone si hay contraseña), deja que el error del
+  servidor lo explique. Los errores de esta sección se muestran con `.alert` (modal),
+  no como texto en la pantalla: un texto pegado a la sección puede quedar fuera de
+  vista si el usuario no hace scroll tras pulsar el botón.
 
 Endpoints de auth: `register`, `login`, `refresh`, `logout`, `google`, `me` (`GET`/`PATCH`),
-`me/avatar` (`POST`/`DELETE`), `users` (`GET`, superadmin), `users/{id}` (`PATCH`,
-superadmin).
+`me/avatar` (`POST`/`DELETE`), `me/google` (`POST`/`DELETE`), `users` (`GET`, superadmin),
+`users/{id}` (`PATCH`, superadmin).
 
 ---
 
@@ -327,7 +335,7 @@ API ya lo expone.
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, recuperación por email, verificación de correo. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez) ✅; pendiente: vincular/desvincular desde perfil, cambio y recuperación de contraseña, verificación de correo |
+| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, recuperación por email, verificación de correo. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez, vincular/desvincular desde perfil) ✅; pendiente: cambio y recuperación de contraseña, verificación de correo |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

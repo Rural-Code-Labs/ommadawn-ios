@@ -332,7 +332,7 @@ struct LoginView: View {
     /// Google), no se muestra ningún error — es una acción deliberada, no un
     /// fallo.
     private func submitWithGoogle() async {
-        guard !isSubmitting, let presenter = topViewController() else { return }
+        guard !isSubmitting, let presenter = UIApplication.shared.topViewController else { return }
         errorMessage = nil
         isSubmitting = true
         defer { isSubmitting = false }
@@ -369,16 +369,6 @@ struct LoginView: View {
         case .network:
             "No se pudo conectar. Comprueba tu conexión."
         }
-    }
-
-    /// El SDK de Google necesita un `UIViewController` sobre el que presentar
-    /// su navegador embebido — SwiftUI no expone uno directamente.
-    private func topViewController() -> UIViewController? {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first(where: \.isKeyWindow)?
-            .rootViewController
     }
 }
 
