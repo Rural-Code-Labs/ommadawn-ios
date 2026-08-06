@@ -158,13 +158,30 @@ Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
 
 ### Backlog — Fase 5: Mejoras de autenticación
 
+**Login con Google** (decisiones tomadas, ago 2026): SDK oficial `GoogleSignIn-iOS`
+(no `ASWebAuthenticationSession` a mano — menos código propio, mejor soporte de casos
+límite). La app solo obtiene el **ID token de Google** y se lo pasa a la API; la API
+verifica el token con Google y emite el par access/refresh propio de siempre —
+`AuthSession` no distingue después si la sesión vino de contraseña o de Google. Conflicto
+de email (alguien intenta entrar con Google usando un email que ya existe con
+contraseña): **error con sugerencia**, no auto-vinculación ni prompt de vinculación en el
+propio login — es la opción más segura y sin fricción en el flujo feliz; la vinculación
+vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
+
 | # | Mejora | Requiere API |
 |---|---|---|
-| 5.1 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
-| 5.2 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
-| 5.3 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
+| 5.1 | **Google Sign-In — login/registro básico**: botón "Continuar con Google" en `LoginView` funcional (ver `googleSignInButton`, hoy solo placeholder). SDK `GoogleSignIn-iOS` obtiene el ID token; la app lo envía a la API. Si el email es nuevo, la API crea la cuenta; si ya existe vinculado a Google, hace login. | 🔴 API: `POST /auth/google` con `id_token` → verifica con Google, crea/loguea usuario, devuelve access+refresh igual que `/auth/login` |
+| 5.2 | **Conflicto de email**: si el ID token de Google trae un email que ya existe en una cuenta creada con contraseña (sin Google vinculado), la API responde con un código de error específico y la app muestra "Ya tienes una cuenta con ese email. Entra con tu contraseña y vincula Google desde tu perfil." (sin crear duplicados ni vincular a ciegas). | 🔴 API: `POST /auth/google` devuelve un código de error distinguible (ej. `409` + `email_conflict`) en vez de un 401/422 genérico |
+| 5.3 | **Vincular/desvincular Google desde el perfil**: en `AccountProfileView`, botón "Conectar con Google" (mismo flujo SDK, pero llama a un endpoint de vinculación en vez de login) y "Desconectar Google" — este último solo visible si el usuario tiene contraseña propia, para no dejar la cuenta sin forma de entrar. | 🔴 API: `POST /auth/me/google` (vincula, requiere sesión) + `DELETE /auth/me/google` (desvincula, rechaza si es el único método de acceso) |
+| 5.4 | **Cambiar contraseña**: formulario en `AccountProfileView` (o hoja aparte) con contraseña actual + nueva + confirmación. | 🔴 API: `POST /auth/me/password` con `current_password` + `new_password` |
+| 5.5 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
+| 5.6 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
 
-> 5.2 y 5.3 comparten infraestructura de email (proveedor SMTP o servicio transaccional). Tiene sentido implementarlas juntas en el servidor.
+> 5.1–5.3 (Google) son el frente activo de trabajo, en ese orden: primero login/registro
+> básico, luego el conflicto de email, luego la vinculación desde perfil — cada paso se
+> apoya en el anterior. 5.5 y 5.6 comparten infraestructura de email (proveedor SMTP o
+> servicio transaccional) y tiene sentido implementarlas juntas en el servidor cuando
+> llegue su turno.
 
 ### Backlog — Fases futuras
 
@@ -508,7 +525,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos (consume la Fase 5 de la API). | 🚧 En marcha — listado/detalle ✅, cabecera ✅, AccountMenu simplificado ✅, SettingsView con apariencia sincronizada ✅, perfil con avatar ✅, gestión de admins ✅, AboutView ✅, edición de catálogo para admins (Release/Edition CRUD + tracklist + imágenes) ✅, lista de ediciones con miniaturas ✅, selector de entorno debug ✅, detalle de lectura completo con secciones desplegables y renderizado WKWebView ✅, botón de preview en editor Markdown ✅. Pendiente: 4.2 nombre de edición, 4.3 créditos por pista, 4.4 sello seleccionable. |
-| **5 — Mejoras de autenticación** | Cambio de contraseña, recuperación por email y verificación de correo al registrarse. | Pendiente |
+| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, recuperación por email y verificación de correo al registrarse. | Pendiente |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
