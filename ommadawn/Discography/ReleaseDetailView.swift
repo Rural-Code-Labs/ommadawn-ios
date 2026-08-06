@@ -313,10 +313,10 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
                     Text(Country.find(country)?.displayName ?? country)
                 }
             }
-            if let label = edition.label, !label.isEmpty {
+            if let label = edition.label {
                 GridRow {
                     Text("Sello").foregroundStyle(.secondary)
-                    Text(label)
+                    Text(label.name)
                 }
             }
             if let dateStr = edition.release_date {
@@ -525,7 +525,7 @@ private struct EditionRow: View {
                 let subtitle = [
                     edition.format?.displayName,
                     edition.release_date.map { String($0.prefix(4)) },
-                    edition.label
+                    edition.label?.name
                 ].compactMap { $0 }.joined(separator: " · ")
 
                 if !subtitle.isEmpty {
@@ -578,7 +578,7 @@ private struct EditionListSheet: View {
     }
 
     private var availableLabels: [String] {
-        Array(Set(release.editions.compactMap { $0.label })).sorted()
+        Array(Set(release.editions.compactMap { $0.label?.name })).sorted()
     }
 
     private var availableCountries: [String] {
@@ -603,7 +603,7 @@ private struct EditionListSheet: View {
             let yearOK = selectedYears.isEmpty ||
                 edition.release_date.map { selectedYears.contains(String($0.prefix(4))) } == true
             let labelOK = selectedLabels.isEmpty ||
-                edition.label.map { selectedLabels.contains($0) } == true
+                edition.label.map { selectedLabels.contains($0.name) } == true
             let countryOK = selectedCountries.isEmpty ||
                 edition.country.map { selectedCountries.contains($0) } == true
             return formatOK && yearOK && labelOK && countryOK

@@ -28,6 +28,9 @@ public typealias ReleaseImage = Components.Schemas.ImageRead
 public typealias ReleaseImageType = Components.Schemas.ImageType
 /// Formato de una `Edition`: `.vinyl`, `.cd`, `.single`, `.maxi_single`, `.cd_single`, `.cassette`.
 public typealias EditionFormat = Components.Schemas.EditionFormat
+/// Sello discográfico de una `Edition`.
+/// No se llama `Label` a secas: colisionaría con `SwiftUI.Label` en las vistas.
+public typealias RecordLabel = Components.Schemas.LabelRead
 
 /// El generador ya le da `id: Int`; declararlo aquí (dentro del propio
 /// paquete, no en el target de la app) evita el warning de conformidad

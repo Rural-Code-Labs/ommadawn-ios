@@ -28,7 +28,8 @@ struct EditionEditView: View {
     @State private var editionName: String
     @State private var countryCode: String?
     @State private var showingCountryPicker = false
-    @State private var label: String
+    @State private var selectedLabel: RecordLabel?
+    @State private var showingLabelPicker = false
     @State private var catalogNumber: String
     @State private var format: EditionFormat?
     @State private var includesDate: Bool
@@ -66,7 +67,7 @@ struct EditionEditView: View {
 
         _editionName   = State(initialValue: edition?.edition_name ?? "")
         _countryCode   = State(initialValue: edition?.country)
-        _label         = State(initialValue: edition?.label ?? "")
+        _selectedLabel = State(initialValue: edition?.label)
         _catalogNumber = State(initialValue: edition?.catalog_number ?? "")
         _format        = State(initialValue: edition?.format)
         _isPrimary     = State(initialValue: edition?.is_primary ?? (release.editions.isEmpty))
@@ -167,9 +168,18 @@ struct EditionEditView: View {
             .sheet(isPresented: $showingCountryPicker) {
                 CountryPickerView(selectedCode: $countryCode)
             }
-            LabeledContent("Sello") {
-                TextField("Virgin, Polydor…", text: $label)
-                    .multilineTextAlignment(.trailing)
+            Button { showingLabelPicker = true } label: {
+                LabeledContent("Sello") {
+                    if let l = selectedLabel {
+                        Text(l.name).foregroundStyle(.primary)
+                    } else {
+                        Text("Sin especificar").foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .foregroundStyle(.primary)
+            .sheet(isPresented: $showingLabelPicker) {
+                LabelPickerView(selectedLabel: $selectedLabel, store: DiscographyStore(client: session.client))
             }
             LabeledContent("Núm. catálogo") {
                 TextField("V2001, OVED 1…", text: $catalogNumber)
@@ -444,7 +454,7 @@ struct EditionEditView: View {
         let payload = EditionPayload(
             editionName: editionName,
             country: countryCode,
-            label: label,
+            labelId: selectedLabel?.id,
             catalogNumber: catalogNumber,
             releaseDate: includesDate ? Self.dateFormatter.string(from: releaseDate) : nil,
             format: format,
@@ -715,7 +725,7 @@ private struct RecordingSearchSheet: View {
 #Preview("Editar") {
     let track = Track(id: 1, recording_id: 1, position: 1, disc_number: 1, title: "Tubular Bells Part One", duration_seconds: 1530)
     let edition = Edition(
-        id: 1, country: "UK", label: "Virgin", edition_name: nil,
+        id: 1, country: "UK", label: RecordLabel(id: 1, name: "Virgin"), edition_name: nil,
         catalog_number: "V2001", release_date: "1973-05-25",
         format: .vinyl, credits: nil, notes: nil,
         is_primary: true, tracks: [track], images: []

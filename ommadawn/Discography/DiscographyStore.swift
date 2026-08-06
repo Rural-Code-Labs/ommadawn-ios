@@ -25,7 +25,7 @@ enum DiscographyError: Error {
 struct EditionPayload {
     var editionName: String = ""
     var country: String? = nil
-    var label: String = ""
+    var labelId: Int? = nil
     var catalogNumber: String = ""
     var releaseDate: String? = nil     // "YYYY-MM-DD" o nil
     var format: EditionFormat? = nil
@@ -192,7 +192,7 @@ struct DiscographyStore {
         do {
             let body = Components.Schemas.EditionCreate(
                 country: data.country,
-                label: data.label.nilIfEmpty,
+                label_id: data.labelId,
                 edition_name: data.editionName.trimmingCharacters(in: .whitespacesAndNewlines),
                 catalog_number: data.catalogNumber.nilIfEmpty,
                 release_date: data.releaseDate,
@@ -221,7 +221,7 @@ struct DiscographyStore {
         do {
             let body = Components.Schemas.EditionUpdate(
                 country: data.country,
-                label: data.label.nilIfEmpty,
+                label_id: data.labelId,
                 edition_name: data.editionName.trimmingCharacters(in: .whitespacesAndNewlines),
                 catalog_number: data.catalogNumber.nilIfEmpty,
                 release_date: data.releaseDate,
@@ -397,6 +397,61 @@ struct DiscographyStore {
         } catch let e as DiscographyError { throw e }
         catch { throw DiscographyError.network(error) }
     }
+
+    // MARK: - Sellos
+
+    func fetchLabels(q: String = "") async throws -> [Components.Schemas.LabelRead] {
+        do {
+            let output = try await client.list_labels_api_v1_discography_labels_get(
+                .init(query: .init(q: q.isEmpty ? nil : q))
+            )
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Intenta borrar el sello. Devuelve `false` si tiene ediciones asociadas (409).
+    @discardableResult
+    func deleteLabel(id: Int) async throws -> Bool {
+        do {
+            let output = try await client.delete_label_api_v1_discography_labels__label_id__delete(
+                .init(path: .init(label_id: id))
+            )
+            switch output {
+            case .noContent: return true
+            case .conflict: return false
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: return true
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    func createLabel(name: String) async throws -> Components.Schemas.LabelRead {
+        do {
+            let output = try await client.create_label_api_v1_discography_labels_post(
+                .init(body: .json(.init(name: name)))
+            )
+            switch output {
+            case .created(let r): return try r.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .conflict: throw DiscographyError.unexpected(409)
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    // MARK: - Grabaciones
 
     /// Intenta borrar la grabación. Devuelve `false` si sigue en uso (409).
     @discardableResult
