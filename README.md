@@ -44,8 +44,8 @@ para esta app. Android queda para el futuro con otra base de código.
 - 🚧 **Fase 5 — Mejoras de autenticación**: login con Google (SDK oficial, conflicto de
   email con sugerencia, sin auto-vincular), nombre de usuario editable una sola vez
   cuando lo asigna Google, vincular/desvincular Google desde el perfil, y cambiar/
-  agregar/quitar contraseña. Pendiente: recuperación de contraseña por email,
-  verificación de correo.
+  agregar/quitar contraseña. Pendiente: verificación de correo, recuperación de
+  contraseña por email.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -343,7 +343,7 @@ API ya lo expone.
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, recuperación por email, verificación de correo. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez, vincular/desvincular desde perfil), cambiar/agregar/quitar contraseña ✅; pendiente: recuperación por email, verificación de correo |
+| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, verificación de correo, recuperación por email. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez, vincular/desvincular desde perfil), cambiar/agregar/quitar contraseña ✅; pendiente: verificación de correo, recuperación por email |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

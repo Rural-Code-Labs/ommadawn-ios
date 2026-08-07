@@ -280,8 +280,8 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 | 5.2 | **Conflicto de email**: email de Google ya existente con contraseña → `409 email_conflict`, mensaje con sugerencia, sin auto-vincular ni duplicar. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.3 | **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" (mismo flujo SDK, llama a un endpoint de vinculación) y "Desconectar Google". Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.4 | **Cambiar/agregar/quitar contraseña**: hoja en `AccountProfileView` con contraseña actual (si aplica) + nueva + confirmación. Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
-| 5.5 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | Pendiente | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
-| 5.6 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | Pendiente | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
+| 5.5 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | Pendiente | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
+| 5.6 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | Pendiente | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
 
 **Desglose de 5.1** (todo hecho el 6 ago 2026, ver también la sección "Login con Google" más arriba):
 
@@ -668,7 +668,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, recuperación por email y verificación de correo al registrarse. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅, 5.3 vincular/desvincular desde perfil ✅, 5.4 cambiar/agregar/quitar contraseña ✅. Pendiente: 5.5 recuperar contraseña, 5.6 verificación de correo. |
+| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, verificación de correo y recuperación por email. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅, 5.3 vincular/desvincular desde perfil ✅, 5.4 cambiar/agregar/quitar contraseña ✅. Pendiente: 5.5 verificación de correo, 5.6 recuperar contraseña. |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
