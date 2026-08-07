@@ -70,6 +70,18 @@ enum EmailVerificationError: Error {
     case network(Error)
 }
 
+/// Motivos por los que confirmar un reset de contraseña puede fallar.
+///
+/// No hay caso "cuenta no encontrada": la API da el mismo `401` que un
+/// código incorrecto, a propósito, para no revelar qué cuentas existen.
+enum PasswordResetError: Error {
+    case invalidCode      // 401 — código incorrecto/caducado, O la cuenta no existe (mismo caso)
+    case tooManyAttempts  // 429
+    case invalidData      // 422 — código mal formado o contraseña fuera de longitud
+    case unexpected(Int)
+    case network(Error)
+}
+
 /// Motivos por los que un registro puede fallar.
 enum RegisterError: Error {
     case alreadyTaken             // 409 — usuario o email ya en uso
@@ -199,6 +211,65 @@ final class AuthSession {
         } catch {
             // Transporte, decodificación o /me fallando: todo cae aquí.
             throw LoginError.network(error)
+        }
+    }
+
+    /// Pide un código de 6 dígitos para restablecer la contraseña. La API
+    /// responde igual (sin lanzar nada) tanto si la cuenta existe como si
+    /// no — no hay forma de saber por aquí cuál de las dos pasó, a
+    /// propósito.
+    func requestPasswordReset(usernameOrEmail: String) async throws {
+        do {
+            let output = try await client.request_password_reset_api_v1_auth_password_reset_request_post(
+                .init(body: .json(.init(username_or_email: usernameOrEmail)))
+            )
+            switch output {
+            case .noContent:
+                return
+            case .unprocessableContent:
+                throw PasswordResetError.invalidData
+            case .undocumented(let statusCode, _):
+                throw PasswordResetError.unexpected(statusCode)
+            }
+        } catch let error as PasswordResetError {
+            throw error
+        } catch {
+            throw PasswordResetError.network(error)
+        }
+    }
+
+    /// Confirma el código y establece la contraseña nueva. Si va bien, la
+    /// API devuelve el mismo `TokenPair` que `logIn` — la sesión queda
+    /// iniciada sin pedir un segundo login.
+    func confirmPasswordReset(usernameOrEmail: String, code: String, newPassword: String) async throws {
+        do {
+            let output = try await client.confirm_password_reset_api_v1_auth_password_reset_confirm_post(
+                .init(body: .json(.init(
+                    username_or_email: usernameOrEmail,
+                    code: code,
+                    new_password: newPassword
+                )))
+            )
+            switch output {
+            case .ok(let ok):
+                let pair = try ok.body.json
+                try await tokenStore.save(AuthTokens(pair: pair))
+                let user = try await fetchProfile()
+                applyTheme(from: user)
+                state = .signedIn(user)
+            case .unauthorized:
+                throw PasswordResetError.invalidCode
+            case .tooManyRequests:
+                throw PasswordResetError.tooManyAttempts
+            case .unprocessableContent:
+                throw PasswordResetError.invalidData
+            case .undocumented(let statusCode, _):
+                throw PasswordResetError.unexpected(statusCode)
+            }
+        } catch let error as PasswordResetError {
+            throw error
+        } catch {
+            throw PasswordResetError.network(error)
         }
     }
 

@@ -41,11 +41,11 @@ para esta app. Android queda para el futuro con otra base de código.
   vinculadas (🔗 cápsula + ✕ para desvincular), borrado automático de grabaciones huérfanas
   al quitar un track, indicador de uso en el buscador de grabaciones, y sello discográfico
   seleccionable de una tabla (crear/eliminar).
-- 🚧 **Fase 5 — Mejoras de autenticación**: login con Google (SDK oficial, conflicto de
+- ✅ **Fase 5 — Mejoras de autenticación**: login con Google (SDK oficial, conflicto de
   email con sugerencia, sin auto-vincular), nombre de usuario editable una sola vez
   cuando lo asigna Google, vincular/desvincular Google desde el perfil, cambiar/
-  agregar/quitar contraseña, y verificación de correo por código de 6 dígitos.
-  Pendiente: recuperación de contraseña por email.
+  agregar/quitar contraseña, verificación de correo y recuperación de contraseña por
+  código de 6 dígitos.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -241,11 +241,19 @@ Cómo está montado:
   "Sin verificar" junto al email abre una hoja para pedir/confirmar el código — no se
   envía nada automáticamente al abrirla, para no invalidar un código que la persona ya
   tuviera sin leer.
+- **Recuperar contraseña**: mismo patrón de código de 6 dígitos, sin sesión (es justo
+  el caso que resuelve esto). La API no revela si una cuenta existe — responde igual
+  pida quien pida un código, exista o no el email/usuario — y da el mismo error tanto
+  si el código es incorrecto como si la cuenta no existe, para que el endpoint no
+  sirva para averiguar qué cuentas están registradas. Al confirmar con el código y la
+  contraseña nueva, la API loguea directamente (mismo `TokenPair` que `/auth/login`),
+  sin pedir un segundo login. Enlace "¿Olvidaste tu contraseña?" en `LoginView`.
 
 Endpoints de auth: `register`, `login`, `refresh`, `logout`, `google`, `me` (`GET`/`PATCH`),
 `me/avatar` (`POST`/`DELETE`), `me/google` (`POST`/`DELETE`), `me/password`
-(`POST`/`DELETE`), `verify-email/request`, `verify-email/confirm`, `users` (`GET`,
-superadmin), `users/{id}` (`PATCH`, superadmin).
+(`POST`/`DELETE`), `verify-email/request`, `verify-email/confirm`,
+`password-reset/request`, `password-reset/confirm`, `users` (`GET`, superadmin),
+`users/{id}` (`PATCH`, superadmin).
 
 ---
 
@@ -351,7 +359,7 @@ API ya lo expone.
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, verificación de correo, recuperación por email. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez, vincular/desvincular desde perfil), cambiar/agregar/quitar contraseña, verificación de correo por código ✅; pendiente: recuperación por email |
+| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, verificación de correo, recuperación por email. | ✅ Hecha |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

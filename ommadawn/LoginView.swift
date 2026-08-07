@@ -33,6 +33,8 @@ struct LoginView: View {
     @State private var errorMessage: String?
     /// Controla la presentación de la hoja de registro.
     @State private var showingRegister = false
+    /// Controla la presentación de la hoja de recuperar contraseña.
+    @State private var showingForgotPassword = false
     /// Controla la presentación del panel "Acerca de".
     @State private var showingAbout = false
     @State private var showingEnvironmentPicker = false
@@ -61,11 +63,14 @@ struct LoginView: View {
 
                 loginButton
 
+                VStack(spacing: 6) {
+                    registerLink
+                    forgotPasswordLink
+                }
+
                 orDivider
 
                 googleSignInButton
-
-                registerLink
 
                 environmentBadge
             }
@@ -147,6 +152,17 @@ struct LoginView: View {
             passwordField
         }
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var forgotPasswordLink: some View {
+        Button("¿Olvidaste tu contraseña?") {
+            showingForgotPassword = true
+        }
+        .font(.footnote)
+        .sheet(isPresented: $showingForgotPassword) {
+            ForgotPasswordView()
+                .environment(session)
+        }
     }
 
     private var usernameField: some View {

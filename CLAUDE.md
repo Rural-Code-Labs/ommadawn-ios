@@ -42,10 +42,11 @@ con otra base de código.
   ante `401` y **proactiva** usando `expires_in` — y logout), **Fase 4 hecha** (discografía
   completa: listado con grid/lista/filtro/orden, detalle con tracklist, cabecera común de
   la app, perfil de usuario editable con avatar, gestión de administradores, edición
-  completa del catálogo para admins, sello seleccionable) y **Fase 5 en marcha** (login con
+  completa del catálogo para admins, sello seleccionable) y **Fase 5 hecha** (login con
   Google: alta/login básico, conflicto de email, nombre de usuario editable una sola vez
   cuando lo asignó Google, vincular/desvincular Google desde el perfil, cambiar/agregar/
-  quitar contraseña, y verificación de correo por código — ver más abajo).
+  quitar contraseña, verificación de correo por código, y recuperación de contraseña por
+  código — ver más abajo).
   Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
@@ -283,6 +284,34 @@ Google. Probado en simulador y en dispositivo físico contra pre-producción.
     generaban pero no llegaban a la consola (a diferencia de los logs de acceso, que
     son de uvicorn y se configuran aparte) — hubo que arreglarlo en la API para poder
     ver el código al probar en local.
+- **Recuperar contraseña** (5.6, 6 ago 2026): mismo patrón que la verificación de
+  email (código de 6 dígitos, 2h de caducidad, 5 intentos fallidos en ventana móvil
+  de 24h), pero **sin sesión** — es justo el caso que resuelve esto — y con dos
+  cuidados de seguridad propios de este flujo.
+  - **No revela qué cuentas existen**: `POST /auth/password-reset/request` responde
+    `204` exista o no la cuenta con ese `username_or_email` — solo envía el email si
+    existe, pero la respuesta es idéntica en ambos casos. `POST
+    /auth/password-reset/confirm` da el mismo `401` (`detail: "invalid_code"`) tanto
+    si el código es incorrecto/caducado como si la cuenta directamente no existe — un
+    único caso para los tres motivos, para que este endpoint sin autenticar no sirva
+    para averiguar qué emails/usernames están registrados. Los textos de
+    `ForgotPasswordView` mantienen el mismo cuidado ("si existe una cuenta...", nunca
+    "hemos enviado" a secas).
+  - **Login automático al confirmar**: `confirm` devuelve el mismo `TokenPair` que
+    `POST /auth/login` — `AuthSession.confirmPasswordReset` guarda los tokens y deja
+    la sesión `signedIn` directamente, sin volver a la pantalla de login a mano
+    (mismo patrón que `register`, que encadena un `logIn`).
+  - **`PasswordResetError`**: sin caso "cuenta no encontrada" — el único caso de
+    "código no válido" (`invalidCode`) cubre también ese motivo, reflejando la misma
+    ambigüedad deliberada de la API.
+  - **Middleware de auth**: los dos endpoints van sin `Bearer` — añadidos a la lista
+    de exclusión de `AuthMiddleware.swift` **antes** de compilar esta vez (la lección
+    de `/auth/google` en 5.1 no se repitió).
+  - **`ForgotPasswordView.swift`** (`Auth/`): mismo patrón de dos pasos que
+    `VerifyEmailView` (botón "Enviar código" primero, campo + "Verificar"/"Reenviar
+    código" después). Se abre desde un enlace "¿Olvidaste tu contraseña?" en
+    `LoginView`, agrupado en un `VStack` compacto junto a "Crear cuenta" (los dos
+    centrados, pegados, separados del resto de la pantalla).
 
 ### Backlog — Fase 4 (completa)
 
@@ -314,7 +343,7 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 | 5.3 | **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" (mismo flujo SDK, llama a un endpoint de vinculación) y "Desconectar Google". Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.4 | **Cambiar/agregar/quitar contraseña**: hoja en `AccountProfileView` con contraseña actual (si aplica) + nueva + confirmación. Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.5 | **Verificación de correo**: código de 6 dígitos por email, "soft" (no bloquea nada). Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
-| 5.6 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | Pendiente | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
+| 5.6 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): código de 6 dígitos, no revela qué cuentas existen, login automático al confirmar. Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 
 **Desglose de 5.1** (todo hecho el 6 ago 2026, ver también la sección "Login con Google" más arriba):
 
@@ -360,8 +389,18 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 | 5.5.4 | Manejo de errores (`invalidCode`, `tooManyAttempts`, sesión caducada, servidor) | app |
 | 5.5.5 | Probado en simulador (incluye arreglar el logger `app.email`, que no llegaba a la consola en dev) | app + API |
 
-> 5.6 (recuperar contraseña) reutiliza la infraestructura de email que 5.5 ya deja
-> montada (proveedor SMTP o servicio transaccional en la API) — buen siguiente paso.
+**Desglose de 5.6** (todo hecho el 6 ago 2026):
+
+| # | Subtarea | Dónde |
+|---|---|---|
+| 5.6.1 | `POST /auth/password-reset/request` + `/confirm`: código de 6 dígitos, sin revelar si la cuenta existe, login automático (`TokenPair`) al confirmar | `ommadawn-api` |
+| 5.6.2 | `AuthSession.requestPasswordReset(usernameOrEmail:)` + `confirmPasswordReset(usernameOrEmail:code:newPassword:)` | app |
+| 5.6.3 | `ForgotPasswordView.swift` + enlace "¿Olvidaste tu contraseña?" en `LoginView` | app |
+| 5.6.4 | Manejo de errores (`invalidCode` cubre también "cuenta no existe", `tooManyAttempts`, servidor) | app |
+| 5.6.5 | Probado en simulador, incluida una cuenta inexistente para confirmar que la respuesta no la delata | app |
+
+Con esto, la **Fase 5 queda completa**: login con Google, conflicto de email, vincular/
+desvincular, cambiar/agregar/quitar contraseña, verificar correo y recuperar contraseña.
 
 ### Backlog — Fases futuras
 
@@ -569,7 +608,8 @@ ommadawn/
 │   ├── Auth/
 │   │   ├── AuthSession.swift    # @Observable: sesión + perfil + avatar + logout + Google
 │   │   ├── GoogleAuthConfig.swift # Client ID iOS + Web/servidor (login con Google)
-│   │   └── RegisterView.swift
+│   │   ├── RegisterView.swift
+│   │   └── ForgotPasswordView.swift # Recuperar contraseña por código de 6 dígitos
 │   ├── Account/
 │   │   ├── AccountMenu.swift          # Menú desplegable (nombre, apariencia, admin, logout)
 │   │   ├── AccountProfileView.swift   # Hoja de perfil: avatar + datos editables
@@ -712,7 +752,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, verificación de correo y recuperación por email. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅, 5.3 vincular/desvincular desde perfil ✅, 5.4 cambiar/agregar/quitar contraseña ✅, 5.5 verificación de correo ✅. Pendiente: 5.6 recuperar contraseña. |
+| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, verificación de correo y recuperación por email. | ✅ Hecha |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
