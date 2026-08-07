@@ -42,11 +42,12 @@ con otra base de código.
   ante `401` y **proactiva** usando `expires_in` — y logout), **Fase 4 hecha** (discografía
   completa: listado con grid/lista/filtro/orden, detalle con tracklist, cabecera común de
   la app, perfil de usuario editable con avatar, gestión de administradores, edición
-  completa del catálogo para admins, sello seleccionable) y **Fase 5 hecha** (login con
+  completa del catálogo para admins, sello seleccionable), **Fase 5 hecha** (login con
   Google: alta/login básico, conflicto de email, nombre de usuario editable una sola vez
   cuando lo asignó Google, vincular/desvincular Google desde el perfil, cambiar/agregar/
   quitar contraseña, verificación de correo por código, y recuperación de contraseña por
-  código — ver más abajo).
+  código) y **Fase 6 hecha** (colecciones de ediciones: agrupar ediciones de discos
+  distintos bajo un nombre, ej. "Remasterizaciones HDCD" — ver más abajo).
   Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
@@ -313,6 +314,66 @@ Google. Probado en simulador y en dispositivo físico contra pre-producción.
     `LoginView`, agrupado en un `VStack` compacto junto a "Crear cuenta" (los dos
     centrados, pegados, separados del resto de la pantalla).
 
+## Colecciones de ediciones (Fase 6, 7 ago 2026)
+
+Agrupar ediciones que pertenecen a **discos distintos** bajo un nombre común — ej.
+"Remasterizaciones HDCD" junta la edición HDCD de *Tubular Bells*, la de *Hergest
+Ridge*, etc., cada una en su propio `Release`. **No confundir** con una caja física de
+varios discos de un mismo álbum: eso ya es un `Release` normal de tipo compilación, no
+necesitaba nada nuevo — la idea original del backlog ("agrupar ediciones para cajas
+multi-disco") se descartó a favor de este planteamiento, más útil de verdad.
+
+- **Navegación — opción elegida tras comparar tres**: un segmented control "Discos |
+  Colecciones" **dentro** de la pestaña Discografía (`ReleaseListView`), no una pestaña
+  aparte ni un añadido secundario. Se valoraron tres opciones (mockups en la
+  conversación): segmented control (elegida — mismo peso que "Discos", con sus propios
+  controles), fila destacada encima de la rejilla (descartada — relega las colecciones
+  a contenido secundario), y solo enlace inverso sin listado propio (insuficiente para
+  explorar). El enlace inverso desde una edición se hizo **además**, no en lugar de.
+- **Modelo**: `Collection` (id, name único, description opcional) + tabla puente con
+  `Edition`, **sin campo de orden propio** — el orden dentro de una colección es
+  siempre por `release_date` de la edición (las sin fecha, al final), nunca manual.
+  Una edición puede estar en 0, 1 o varias colecciones a la vez.
+- **`DiscographyStore`**: `fetchCollections`, `fetchCollection(id:)`, `createCollection`,
+  `updateCollection`, `deleteCollection` (solo si `edition_count == 0`, mismo criterio
+  que sellos), `addEdition(_:toCollection:)` / `removeEdition(_:fromCollection:)`.
+- **`Models.swift`**: `CollectionSummary` (listado, con `sample_cover_urls` — portadas
+  de las 2-3 primeras ediciones por fecha), `CollectionDetail` (detalle, con
+  `editions: [CollectionEdition]`), `CollectionEdition` (una edición dentro de una
+  colección, con `release_id`/`release_title`/`release_type` porque aquí — a diferencia
+  de `Edition` anidada bajo su `Release` — el disco de origen no es implícito),
+  `CollectionTag` (vista mínima `id`+`name`, colgada de `Edition.collections`).
+- **`ReleaseListView`**: el "+" de admin crea un disco o una colección según el scope
+  activo; en modo colecciones no hay filtro de tipo ni grid/lista todavía (una sola
+  lista alfabética basta con el catálogo actual). El array `collections` vive en
+  `ReleaseListView` (no en `CollectionListView`), pasado por `@Binding` — mismo patrón
+  que ya usa `releases` con `ReleaseEditView`, para que crear una colección la añada al
+  listado al momento sin depender de un pull-to-refresh.
+- **`CollectionListView.ChainedCovers`**: hasta 3 portadas encadenadas en diagonal
+  (menos si la colección tiene menos ediciones), reutilizable.
+- **`CollectionDetailView`**: tocar una fila pide el `Release` completo (esta vista
+  solo tiene los datos resumidos de `CollectionEditionRead`) y navega — mismo patrón de
+  "cargar antes de navegar" que ya usa la app. Para admins, menú ⋯ con "Editar colección"
+  (nombre/descripción) y "Eliminar colección" (deshabilitado si tiene ediciones).
+  Borrar/editar aquí, igual que borrar un disco, no refresca `CollectionListView`
+  automáticamente (mismo comportamiento ya aceptado en el resto de la app).
+- **`CollectionFormView`** (antes `CollectionCreateView`, renombrada): un único
+  formulario nombre+descripción sirve para crear *y* editar (`existing:` los
+  distingue), en vez de duplicar la hoja.
+- **Tags en `EditionEditView`** (solo en modo edición, llamadas inmediatas — igual que
+  imágenes): sección "Colecciones" con `CollectionTagPickerView`, mismo patrón que
+  `LabelPickerView` (buscar o crear) pero **multi-selección**, porque una edición no
+  está limitada a una sola colección como sí lo está a un sello.
+- **Enlace inverso "Parte de: X"**: en `ReleaseDetailView`, si la edición mostrada
+  pertenece a alguna colección. Usa su **propio** `.navigationDestination(item:)`
+  (`selectedCollectionTag`) en vez de depender del `.navigationDestination(for:
+  CollectionSummary.self)` de `CollectionListView` — esa vista no siempre está montada
+  (solo cuando el scope activo es "Colecciones"), así que ese destino no estaría
+  registrado si el disco se abrió desde el scope "Discos".
+- **`EditionRead.collections` tuvo que añadirse aparte**: hacía falta tanto para
+  precargar los tags al editar como para el enlace inverso, y no se pidió en la
+  primera ronda del contrato — se detectó al implementar 6.4/6.5, no antes.
+
 ### Backlog — Fase 4 (completa)
 
 Leyenda: 🟢 solo app · 🔴 requiere cambio en la API primero
@@ -402,11 +463,31 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 Con esto, la **Fase 5 queda completa**: login con Google, conflicto de email, vincular/
 desvincular, cambiar/agregar/quitar contraseña, verificar correo y recuperar contraseña.
 
+### Backlog — Fase 6 (completa)
+
+Ver también la sección "Colecciones de ediciones" más arriba.
+
+| # | Subtarea | Dónde |
+|---|---|---|
+| 6.1 | Modelo `Collection` + tabla puente con `Edition` (sin orden propio, siempre por `release_date`) + endpoints CRUD | `ommadawn-api` |
+| 6.2 | Segmented "Discos \| Colecciones" en `ReleaseListView` + `CollectionListView` | app |
+| 6.3 | `CollectionDetailView` (ediciones ordenadas, cargar disco al tocar una fila) | app |
+| 6.4 | Tags de colección en `EditionEditView` (`CollectionTagPickerView`, buscar o crear, multi-selección) | app |
+| 6.5 | Enlace inverso "Parte de: X" en `ReleaseDetailView` | app |
+| 6.6 | Probado en simulador | app |
+| 6.7 | *(bonus, no estaba en el plan original)* `PATCH /discography/collections/{id}` (editar nombre/descripción) | `ommadawn-api` |
+| 6.8 | *(bonus)* Botón "Eliminar colección" en `CollectionDetailView` (solo si 0 ediciones) | app |
+| 6.9 | *(bonus)* Botón "Editar colección" — `CollectionFormView` unifica crear y editar | app |
+| 6.10 | Probado borrar/editar en simulador | app |
+
+> `EditionRead.collections` (6.4/6.5) también fue un campo pedido sobre la marcha, no
+> en la ronda inicial de 6.1 — mismo patrón que `has_google`/`has_password` en la Fase 5:
+> se detecta el hueco al implementar la UI que lo necesita, no antes.
+
 ### Backlog — Fases futuras
 
 | Fase | Contenido | Requiere API |
 |---|---|---|
-| **6** | **Colecciones de ediciones**: agrupar ediciones bajo un nombre (ej. "Deluxe Box Set" = edición original + bonus disc + DVD). Lista ordenada de ediciones con nombre propio. Útil para cajas y ediciones multi-disco. | 🔴 API: modelo `EditionCollection` (name, ordered edition IDs), endpoints CRUD |
 | **7** | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios al catálogo; un admin los aprueba/rechaza. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
 | **8** | **Colección personal**: cada usuario marca qué ediciones tiene, con estado del disco y la funda (escala Discogs: Mint / NM / VG+ / VG / G / F / P). Vista de colección propia + botón en detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
 
@@ -622,13 +703,16 @@ ommadawn/
 │   │   └── AdminUsersView.swift
 │   ├── Settings/                 # Ajustes de la app
 │   │   └── SettingsView.swift    # apariencia (sincronizada con servidor) + admin
-│   ├── Discography/              # Fase 4: catálogo + edición para admins
+│   ├── Discography/              # Fase 4: catálogo + edición para admins · Fase 6: colecciones
 │   │   ├── DiscographyStore.swift
 │   │   ├── ReleaseListView.swift
 │   │   ├── ReleaseDetailView.swift
 │   │   ├── ReleaseEditView.swift        # crear/editar/eliminar disco (solo admins)
 │   │   ├── EditionEditView.swift        # crear/editar/eliminar edición + tracklist + imágenes
-│   │   └── Release+Presentation.swift
+│   │   ├── Release+Presentation.swift
+│   │   ├── CollectionListView.swift     # listado de colecciones + CollectionFormView (crear/editar)
+│   │   ├── CollectionDetailView.swift
+│   │   └── CollectionTagPickerView.swift # multi-selección de colecciones para una edición
 │   ├── Shared/                   # Componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + NSLocale.isoCountryCodes + extraCodes
 │   │   ├── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
@@ -753,7 +837,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
 | **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, verificación de correo y recuperación por email. | ✅ Hecha |
-| **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
+| **6 — Colecciones de ediciones** | Agrupar ediciones de discos distintos bajo un nombre común (ej. "Remasterizaciones HDCD"). | ✅ Hecha |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
 | **9 — Conciertos** | Giras, fechas, setlists. | Pendiente |

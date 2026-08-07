@@ -28,10 +28,22 @@ enum ReleaseSortOrder {
     case name
 }
 
+/// Qué se está explorando dentro de la pestaña Discografía: discos (por
+/// obra) o colecciones (ediciones de discos distintos agrupadas por nombre,
+/// ej. "Remasterizaciones HDCD"). Un segmented control en la propia pestaña,
+/// no una pantalla aparte — las colecciones son una forma más de navegar el
+/// catálogo, no un extra escondido.
+enum DiscographyScope {
+    case releases
+    case collections
+}
+
 struct ReleaseListView: View {
     @Environment(AuthSession.self) private var session
 
+    @State private var scope: DiscographyScope = .releases
     @State private var releases: [Release] = []
+    @State private var collections: [CollectionSummary] = []
     @State private var displayMode: DiscographyDisplayMode = .grid
     @State private var typeFilter: ReleaseType?
     @State private var sortOrder: ReleaseSortOrder = .year
@@ -46,6 +58,7 @@ struct ReleaseListView: View {
     /// el mismo resultado.
     @State private var loadTask: Task<Void, Never>?
     @State private var showingCreate = false
+    @State private var showingCreateCollection = false
     @State private var searchText = ""
     @State private var isSearching = false
 
@@ -81,6 +94,7 @@ struct ReleaseListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            scopePicker
             if isSearching {
                 searchBar
                     .transition(.move(edge: .top).combined(with: .opacity))
@@ -100,11 +114,35 @@ struct ReleaseListView: View {
                     releases.append(newRelease)
                 }
             }
+            .sheet(isPresented: $showingCreateCollection) {
+                CollectionFormView(store: store, onCreated: { created in
+                    collections.append(CollectionSummary(
+                        id: created.id, name: created.name,
+                        edition_count: created.editions.count,
+                        sample_cover_urls: []
+                    ))
+                })
+            }
+    }
+
+    /// "Discos | Colecciones" — cambia qué se explora en la pestaña, no
+    /// navega a una pantalla aparte.
+    private var scopePicker: some View {
+        Picker("Ver", selection: $scope.animation(.snappy)) {
+            Text("Discos").tag(DiscographyScope.releases)
+            Text("Colecciones").tag(DiscographyScope.collections)
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
+        .padding(.bottom, 4)
     }
 
     @ViewBuilder
     private var content: some View {
-        if isLoading && releases.isEmpty {
+        if scope == .collections {
+            CollectionListView(store: store, searchText: searchText, collections: $collections)
+        } else if isLoading && releases.isEmpty {
             ProgressView()
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if let errorMessage {
@@ -186,19 +224,25 @@ struct ReleaseListView: View {
     }
 
     /// Filtro/orden y cambio de vista, flotantes sobre el contenido cerca
-    /// del borde inferior derecho, uno encima del otro.
-    /// Si el usuario es admin, añade un botón "+" arriba para crear discos.
+    /// del borde inferior derecho, uno encima del otro. Si el usuario es
+    /// admin, añade un botón "+" arriba (crea un disco o una colección,
+    /// según el scope activo). En colecciones no hay filtro de tipo ni
+    /// grid/lista: es una sola lista, no hace falta esa complejidad todavía.
     private var floatingControls: some View {
         VStack(spacing: 14) {
             if isAdmin {
                 Button {
-                    showingCreate = true
+                    if scope == .releases {
+                        showingCreate = true
+                    } else {
+                        showingCreateCollection = true
+                    }
                 } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 18))
                         .frame(width: 24, height: 24)
                 }
-                .accessibilityLabel("Nuevo disco")
+                .accessibilityLabel(scope == .releases ? "Nuevo disco" : "Nueva colección")
             }
             Button {
                 if isSearching {
@@ -213,8 +257,10 @@ struct ReleaseListView: View {
                     .frame(width: 24, height: 24)
             }
             .accessibilityLabel(isSearching ? "Cerrar búsqueda" : "Buscar")
-            filterMenu
-            viewModeButton
+            if scope == .releases {
+                filterMenu
+                viewModeButton
+            }
         }
         .padding(.vertical, 12)
         .padding(.horizontal, 10)

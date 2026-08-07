@@ -451,6 +451,129 @@ struct DiscographyStore {
         catch { throw DiscographyError.network(error) }
     }
 
+    // MARK: - Colecciones
+
+    /// Lista colecciones (con portadas de muestra, sin detalle completo).
+    func fetchCollections() async throws -> [CollectionSummary] {
+        do {
+            let output = try await client.list_collections_api_v1_discography_collections_get(.init())
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Detalle de una colección: sus ediciones, ordenadas por fecha de publicación.
+    func fetchCollection(id: Int) async throws -> CollectionDetail {
+        do {
+            let output = try await client.get_collection_api_v1_discography_collections__collection_id__get(
+                .init(path: .init(collection_id: id))
+            )
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Crea una colección. `409` si ya existe una con ese nombre.
+    func createCollection(name: String, description: String? = nil) async throws -> CollectionDetail {
+        do {
+            let output = try await client.create_collection_api_v1_discography_collections_post(
+                .init(body: .json(.init(name: name, description: description)))
+            )
+            switch output {
+            case .created(let r): return try r.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .conflict: throw DiscographyError.unexpected(409)
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Edita nombre y/o descripción de una colección. `nil` = no tocar ese campo.
+    func updateCollection(id: Int, name: String? = nil, description: String? = nil) async throws -> CollectionDetail {
+        do {
+            let output = try await client.update_collection_api_v1_discography_collections__collection_id__patch(
+                .init(path: .init(collection_id: id), body: .json(.init(name: name, description: description)))
+            )
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .conflict: throw DiscographyError.unexpected(409)
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Intenta borrar la colección. Devuelve `false` si todavía tiene ediciones (409).
+    @discardableResult
+    func deleteCollection(id: Int) async throws -> Bool {
+        do {
+            let output = try await client.delete_collection_api_v1_discography_collections__collection_id__delete(
+                .init(path: .init(collection_id: id))
+            )
+            switch output {
+            case .noContent: return true
+            case .conflict: return false
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: return true
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Añade una edición a una colección. Idempotente: si ya estaba, no pasa nada.
+    func addEdition(_ editionID: Int, toCollection collectionID: Int) async throws -> CollectionDetail {
+        do {
+            let output = try await client.add_edition_to_collection_api_v1_discography_collections__collection_id__editions_post(
+                .init(path: .init(collection_id: collectionID), body: .json(.init(edition_id: editionID)))
+            )
+            switch output {
+            case .created(let r): return try r.body.json
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
+    /// Quita una edición de una colección (no borra la edición en sí).
+    func removeEdition(_ editionID: Int, fromCollection collectionID: Int) async throws {
+        do {
+            let output = try await client.remove_edition_from_collection_api_v1_discography_collections__collection_id__editions__edition_id__delete(
+                .init(path: .init(collection_id: collectionID, edition_id: editionID))
+            )
+            switch output {
+            case .noContent: return
+            case .unauthorized: throw DiscographyError.forbidden
+            case .forbidden: throw DiscographyError.forbidden
+            case .notFound: throw DiscographyError.notFound
+            case .unprocessableContent: throw DiscographyError.unexpected(422)
+            case .undocumented(let c, _): throw DiscographyError.unexpected(c)
+            }
+        } catch let e as DiscographyError { throw e }
+        catch { throw DiscographyError.network(error) }
+    }
+
     // MARK: - Grabaciones
 
     /// Intenta borrar la grabación. Devuelve `false` si sigue en uso (409).

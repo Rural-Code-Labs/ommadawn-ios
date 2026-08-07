@@ -51,6 +51,11 @@ struct EditionEditView: View {
     @State private var deletingImageID: Int?
     @State private var movingImageID: Int?
 
+    // MARK: - Colecciones (solo en modo edición, llamadas inmediatas — igual que imágenes)
+    @State private var editionCollections: [CollectionTag]
+    @State private var showingCollectionPicker = false
+    @State private var removingCollectionID: Int?
+
     // MARK: - Editores Markdown
     @State private var creditsController = MarkdownEditorController()
     @State private var notesController   = MarkdownEditorController()
@@ -88,6 +93,7 @@ struct EditionEditView: View {
             .sorted { $0.position < $1.position }
             .map { EditableTrack(from: $0) } ?? [])
         _images = State(initialValue: edition?.images ?? [])
+        _editionCollections = State(initialValue: edition?.collections ?? [])
     }
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
@@ -111,6 +117,7 @@ struct EditionEditView: View {
                 )
                 tracklistSection
                 if isEditing { imagesSection }
+                if isEditing { collectionsSection }
                 if let errorMessage {
                     Section {
                         Text(errorMessage).foregroundStyle(.red)
@@ -120,6 +127,15 @@ struct EditionEditView: View {
             .navigationTitle(isEditing ? "Editar edición" : "Nueva edición")
             .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showingCheatsheet) { MarkdownCheatsheetView() }
+            .sheet(isPresented: $showingCollectionPicker) {
+                if let edition {
+                    CollectionTagPickerView(
+                        editionID: edition.id,
+                        selected: $editionCollections,
+                        store: store
+                    )
+                }
+            }
             .sheet(isPresented: Binding(
                 get: { creditsController.showingPreview || notesController.showingPreview },
                 set: { if !$0 { creditsController.showingPreview = false; notesController.showingPreview = false } }
@@ -361,6 +377,43 @@ struct EditionEditView: View {
         }
     }
 
+    /// Tags de colección: a diferencia del sello (una sola por edición),
+    /// una edición puede pertenecer a varias colecciones a la vez —
+    /// "Remasterizaciones HDCD" y "Ediciones Deluxe 2023" no son excluyentes.
+    private var collectionsSection: some View {
+        Section("Colecciones") {
+            if editionCollections.isEmpty {
+                Text("Sin colecciones todavía")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(editionCollections) { tag in
+                    HStack {
+                        Text(tag.name)
+                        Spacer()
+                        if removingCollectionID == tag.id {
+                            ProgressView()
+                        } else {
+                            Button {
+                                Task { await removeFromCollection(tag) }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(removingCollectionID != nil)
+                        }
+                    }
+                }
+            }
+            Button {
+                showingCollectionPicker = true
+            } label: {
+                Label("Añadir a una colección", systemImage: "rectangle.stack.badge.plus")
+            }
+            .disabled(removingCollectionID != nil)
+        }
+    }
+
     // Si el tipo seleccionado ya no está disponible (porque se acaba de subir
     // una portada o contraportada), cambia automáticamente a "Otra".
     private func adjustImageType(hasFront: Bool, hasBack: Bool) {
@@ -420,6 +473,17 @@ struct EditionEditView: View {
             images.removeAll { $0.id == image.id }
         } catch let e as DiscographyError { errorMessage = message(for: e) }
         catch { errorMessage = "No se pudo eliminar la imagen. Inténtalo de nuevo." }
+    }
+
+    private func removeFromCollection(_ tag: CollectionTag) async {
+        guard let edition else { return }
+        removingCollectionID = tag.id
+        defer { removingCollectionID = nil }
+        do {
+            try await store.removeEdition(edition.id, fromCollection: tag.id)
+            editionCollections.removeAll { $0.id == tag.id }
+        } catch let e as DiscographyError { errorMessage = message(for: e) }
+        catch { errorMessage = "No se pudo quitar de la colección. Inténtalo de nuevo." }
     }
 
     private static func mimeType(for data: Data) -> String? {
@@ -728,7 +792,7 @@ private struct RecordingSearchSheet: View {
         id: 1, country: "UK", label: RecordLabel(id: 1, name: "Virgin"), edition_name: nil,
         catalog_number: "V2001", release_date: "1973-05-25",
         format: .vinyl, credits: nil, notes: nil,
-        is_primary: true, tracks: [track], images: []
+        is_primary: true, tracks: [track], images: [], collections: []
     )
     let release = Release(id: 1, title: "Tubular Bells", release_type: .studio, created_at: .now, editions: [edition])
     EditionEditView(release: release, edition: edition, onSave: { _ in })

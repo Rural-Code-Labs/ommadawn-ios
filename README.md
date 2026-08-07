@@ -46,6 +46,12 @@ para esta app. Android queda para el futuro con otra base de código.
   cuando lo asigna Google, vincular/desvincular Google desde el perfil, cambiar/
   agregar/quitar contraseña, verificación de correo y recuperación de contraseña por
   código de 6 dígitos.
+- ✅ **Fase 6 — Colecciones de ediciones**: agrupar ediciones de discos distintos bajo
+  un nombre común (ej. "Remasterizaciones HDCD"), no una caja física de un mismo álbum
+  (eso ya es un disco normal de tipo compilación). Segmented "Discos | Colecciones" en
+  la pestaña Discografía, tags de colección al editar una edición (buscar o crear,
+  multi-selección), enlace inverso "Parte de: X" desde el detalle de un disco, crear/
+  editar/eliminar colecciones para admins.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -111,13 +117,16 @@ ommadawn/
 │   │   └── AdminUsersView.swift
 │   ├── Settings/                      # ajustes de la app
 │   │   └── SettingsView.swift         # apariencia sincronizada con servidor + admin
-│   ├── Discography/                   # Fase 4: catálogo + edición para admins
+│   ├── Discography/                   # Fase 4: catálogo + edición para admins · Fase 6: colecciones
 │   │   ├── DiscographyStore.swift
 │   │   ├── ReleaseListView.swift
 │   │   ├── ReleaseDetailView.swift
 │   │   ├── ReleaseEditView.swift       # crear/editar/eliminar disco (solo admins)
 │   │   ├── EditionEditView.swift       # crear/editar/eliminar edición + tracklist + imágenes
-│   │   └── Release+Presentation.swift
+│   │   ├── Release+Presentation.swift
+│   │   ├── CollectionListView.swift    # listado + CollectionFormView (crear/editar)
+│   │   ├── CollectionDetailView.swift
+│   │   └── CollectionTagPickerView.swift
 │   ├── Shared/                        # componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + lista ISO 3166-1 + "EU"
 │   │   ├── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
@@ -360,7 +369,7 @@ API ya lo expone.
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
 | **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, verificación de correo, recuperación por email. | ✅ Hecha |
-| **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
+| **6 — Colecciones de ediciones** | Agrupar ediciones de discos distintos bajo un nombre común (ej. "Remasterizaciones HDCD"). | ✅ Hecha |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
 | **9 — Conciertos** | Giras, fechas, setlists. | Pendiente |

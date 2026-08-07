@@ -32,7 +32,24 @@ public typealias EditionFormat = Components.Schemas.EditionFormat
 /// No se llama `Label` a secas: colisionaría con `SwiftUI.Label` en las vistas.
 public typealias RecordLabel = Components.Schemas.LabelRead
 
+/// Una colección de ediciones (ej. "Remasterizaciones HDCD"), tal como
+/// aparece en el listado — con portadas de muestra, sin el detalle completo.
+public typealias CollectionSummary = Components.Schemas.CollectionListRead
+/// El detalle de una colección: sus ediciones, ordenadas por fecha de
+/// publicación (nunca a mano — ver `CollectionEdition`).
+public typealias CollectionDetail = Components.Schemas.CollectionDetailRead
+/// Una edición dentro de una colección, con los datos de su obra de origen
+/// (`release_id`/`release_title`/`release_type`) porque aquí, a diferencia
+/// de `Edition` anidada bajo su `Release`, el disco de origen no es implícito.
+public typealias CollectionEdition = Components.Schemas.CollectionEditionRead
+/// Vista mínima (`id` + `name`) de una colección, colgada de
+/// `Edition.collections` — qué colecciones incluyen esta edición.
+public typealias CollectionTag = Components.Schemas.CollectionSummaryRead
+
 /// El generador ya le da `id: Int`; declararlo aquí (dentro del propio
 /// paquete, no en el target de la app) evita el warning de conformidad
 /// retroactiva y permite usar los temas directamente en un `ForEach`.
 extension Track: Identifiable {}
+extension CollectionSummary: Identifiable {}
+extension CollectionEdition: Identifiable {}
+extension CollectionTag: Identifiable {}

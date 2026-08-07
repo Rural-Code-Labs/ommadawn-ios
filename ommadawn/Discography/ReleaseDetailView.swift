@@ -41,6 +41,13 @@ struct ReleaseDetailView: View {
     @State private var showingEditionList = false
     @State private var imageViewerItem: ImageViewerItem?
 
+    // Enlace inverso "Parte de: X" — se declara aquí, propia de esta vista,
+    // en vez de depender del `.navigationDestination(for: CollectionSummary.self)`
+    // de `CollectionListView`: esa vista no siempre está montada (solo cuando
+    // el scope activo es "Colecciones"), así que su destino no estaría
+    // registrado si esta pantalla se abrió desde "Discos".
+    @State private var selectedCollectionTag: CollectionTag?
+
     init(release: Release) {
         _release = State(initialValue: release)
         _selectedEditionID = State(initialValue: release.displayEdition?.id)
@@ -119,6 +126,9 @@ struct ReleaseDetailView: View {
                     } else {
                         if let edition = selectedEdition {
                             editionMeta(edition)
+                            if !edition.collections.isEmpty {
+                                collectionLinks(edition.collections)
+                            }
                             if !edition.tracks.isEmpty {
                                 tracklist(edition.tracks)
                             }
@@ -140,6 +150,9 @@ struct ReleaseDetailView: View {
         .refreshable { await refresh() }
         .fullScreenCover(item: $imageViewerItem) { item in
             ImageViewerView(images: item.images, selectedIndex: item.startIndex)
+        }
+        .navigationDestination(item: $selectedCollectionTag) { tag in
+            CollectionDetailView(collectionID: tag.id, store: store)
         }
         .sheet(isPresented: $showingEditionList) {
             EditionListSheet(
@@ -339,6 +352,24 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
             }
         }
         .font(.subheadline)
+    }
+
+    /// Si esta edición pertenece a alguna colección (ediciones de discos
+    /// distintos agrupadas por nombre, ej. "Remasterizaciones HDCD"), un
+    /// enlace por cada una lleva a su detalle.
+    private func collectionLinks(_ tags: [CollectionTag]) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            ForEach(tags) { tag in
+                Button {
+                    selectedCollectionTag = tag
+                } label: {
+                    Label("Parte de: \(tag.name)", systemImage: "rectangle.stack")
+                        .font(.subheadline)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tint)
+            }
+        }
     }
 
     private func tracklist(_ tracks: [Track]) -> some View {
