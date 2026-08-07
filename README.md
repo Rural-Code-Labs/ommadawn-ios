@@ -15,45 +15,8 @@ las adaptaciones de UI necesarias, macOS exige un entitlement de Keychain que a 
 requiere un perfil de aprovisionamiento de equipo real — complejidad que no compensa
 para esta app. Android queda para el futuro con otra base de código.
 
----
-
-## Estado
-
-- ✅ **Fase 1 — Esqueleto**: proyecto Xcode iOS que arranca.
-- ✅ **Fase 2 — Capa de red**: cliente HTTP tipado generado desde el contrato.
-- ✅ **Fase 3 — Autenticación**: registro, login, tokens en Keychain, renovación
-  automática (reactiva ante `401` y proactiva con `expires_in`) y logout.
-- ✅ **Identidad visual**: logo, wordmark e icono propios.
-- ✅ **Fase 4 — Discografía**: listado (grid/lista, filtro, orden) y detalle con
-  tracklist; cabecera con avatar a la izquierda y engranaje de ajustes a la derecha
-  (solo visible a admins); perfil de usuario editable con avatar y selector de país con
-  bandera; ajustes de apariencia sincronizados con el servidor (en el menú de cuenta);
-  gestión de administradores para superadmins; pantalla "Acerca de"; edición completa
-  del catálogo para admins (disco con descripción Markdown, edición con créditos y notas
-  Markdown, tracklist, imágenes con ↑↓ ordenación); badge de ediciones en portada; filtros
-  multi-selección (tipo, año, sello, país) en la hoja de ediciones con banderas; selector
-  de país con frecuentes y buscador (soporta "EU" — Unión Europea); detalle de lectura
-  completo con secciones desplegables (chevron ∨/∧): descripción junto al título del disco,
-  créditos y notas de la edición, todo renderizado con WKWebView para Markdown real (títulos,
-  listas, negritas, etc.) y altura adaptada al contenido; metadatos como tabla (País, Sello,
-  Publicación con fecha completa, Formato, Cat.); botón de preview (👁) en el editor Markdown
-  para ver el resultado renderizado sin salir del formulario; edición directa de grabaciones
-  vinculadas (🔗 cápsula + ✕ para desvincular), borrado automático de grabaciones huérfanas
-  al quitar un track, indicador de uso en el buscador de grabaciones, y sello discográfico
-  seleccionable de una tabla (crear/eliminar).
-- ✅ **Fase 5 — Mejoras de autenticación**: login con Google (SDK oficial, conflicto de
-  email con sugerencia, sin auto-vincular), nombre de usuario editable una sola vez
-  cuando lo asigna Google, vincular/desvincular Google desde el perfil, cambiar/
-  agregar/quitar contraseña, verificación de correo y recuperación de contraseña por
-  código de 6 dígitos.
-- ✅ **Fase 6 — Colecciones de ediciones**: agrupar ediciones de discos distintos bajo
-  un nombre común (ej. "Remasterizaciones HDCD"), no una caja física de un mismo álbum
-  (eso ya es un disco normal de tipo compilación). Segmented "Discos | Colecciones" en
-  la pestaña Discografía, tags de colección al editar una edición (buscar o crear,
-  multi-selección), enlace inverso "Parte de: X" desde el detalle de un disco, crear/
-  editar/eliminar colecciones para admins.
-
-Ver el [plan por fases](#plan-por-fases) completo abajo.
+Ver el [plan por fases](#plan-por-fases) completo abajo — es la única fuente del estado
+del proyecto, para no mantener el mismo resumen duplicado en dos sitios.
 
 ---
 
@@ -367,9 +330,9 @@ API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator`, cliente base y configuración de entorno. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
-| **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, verificación de correo, recuperación por email. | ✅ Hecha |
-| **6 — Colecciones de ediciones** | Agrupar ediciones de discos distintos bajo un nombre común (ej. "Remasterizaciones HDCD"). | ✅ Hecha |
+| **4 — Discografía** | Listado (grid/lista, filtro, orden) y detalle con tracklist; cabecera con avatar y engranaje de ajustes; perfil editable con avatar y país; apariencia sincronizada con el servidor; gestión de administradores; pantalla "Acerca de"; edición completa del catálogo para admins (descripción/créditos/notas en Markdown con preview, imágenes con ↑↓, filtros multi-selección con banderas, sello discográfico seleccionable). | ✅ Hecha |
+| **5 — Mejoras de autenticación** | Login con Google (SDK oficial, conflicto de email sin auto-vincular), username editable una sola vez cuando lo asigna Google, vincular/desvincular Google desde el perfil, cambiar/agregar/quitar contraseña, verificación de correo y recuperación de contraseña — estas dos últimas por código de 6 dígitos, no por enlace. | ✅ Hecha |
+| **6 — Colecciones de ediciones** | Agrupar ediciones de discos distintos bajo un nombre común (ej. "Remasterizaciones HDCD"), no cajas físicas de un mismo álbum (eso ya es un disco normal). Segmented Discos/Colecciones en la pestaña Discografía, tags al editar una edición (buscar o crear), enlace inverso "Parte de: X", gestión completa para admins. | ✅ Hecha |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
 | **9 — Conciertos** | Giras, fechas, setlists. | Pendiente |
