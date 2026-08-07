@@ -43,6 +43,7 @@ struct AccountProfileView: View {
     @State private var showingChangePassword = false
     @State private var showingRemovePasswordConfirmation = false
     @State private var isRemovingPassword = false
+    @State private var showingVerifyEmail = false
     @State private var errorMessage: String?
     /// Separado del `errorMessage` general: ese vive en su propia `Section`
     /// al final del formulario, demasiado lejos del botón de Google — un
@@ -72,6 +73,9 @@ struct AccountProfileView: View {
                             lockedField(label: "Usuario", value: user.username)
                         }
                         lockedField(label: "Email", value: user.email, showsGoogleMark: user.has_google)
+                        if !user.email_verified {
+                            emailVerificationRow
+                        }
                     }
                     LabeledContent("Nombre completo") {
                         TextField("", text: $fullName)
@@ -217,6 +221,25 @@ struct AccountProfileView: View {
             }
         }
         .foregroundStyle(.secondary)
+    }
+
+    /// Aviso "soft": el email sin verificar no bloquea nada de la app,
+    /// solo se recuerda aquí con un botón para abrir `VerifyEmailView`.
+    private var emailVerificationRow: some View {
+        HStack {
+            Label("Sin verificar", systemImage: "exclamationmark.circle.fill")
+                .font(.footnote)
+                .foregroundStyle(.orange)
+            Spacer()
+            Button("Verificar") {
+                showingVerifyEmail = true
+            }
+            .font(.footnote)
+        }
+        .sheet(isPresented: $showingVerifyEmail) {
+            VerifyEmailView()
+                .environment(session)
+        }
     }
 
     // MARK: - Avatar
@@ -508,10 +531,30 @@ struct AccountProfileView: View {
             username: "user-4821",
             username_is_default: true,
             email: "rafa@example.com",
+            email_verified: true,
             full_name: "Rafa García",
             theme_preference: .system,
             has_google: true,
             has_password: false,
+            is_active: true,
+            is_admin: false,
+            is_super_admin: false,
+            created_at: .now
+        ))))
+}
+
+#Preview("Email sin verificar") {
+    AccountProfileView()
+        .environment(AuthSession(initialState: .signedIn(User(
+            id: 1,
+            username: "rafatest",
+            username_is_default: false,
+            email: "rafa@example.com",
+            email_verified: false,
+            full_name: "Rafa García",
+            theme_preference: .system,
+            has_google: false,
+            has_password: true,
             is_active: true,
             is_admin: false,
             is_super_admin: false,

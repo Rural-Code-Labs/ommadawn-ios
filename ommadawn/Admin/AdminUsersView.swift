@@ -144,6 +144,7 @@ struct AdminUsersView: View {
             username: "discotest2",
             username_is_default: false,
             email: "discotest2@example.com",
+            email_verified: true,
             theme_preference: .system,
             has_google: false,
             has_password: true,

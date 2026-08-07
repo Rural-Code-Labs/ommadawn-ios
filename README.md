@@ -43,9 +43,9 @@ para esta app. Android queda para el futuro con otra base de código.
   seleccionable de una tabla (crear/eliminar).
 - 🚧 **Fase 5 — Mejoras de autenticación**: login con Google (SDK oficial, conflicto de
   email con sugerencia, sin auto-vincular), nombre de usuario editable una sola vez
-  cuando lo asigna Google, vincular/desvincular Google desde el perfil, y cambiar/
-  agregar/quitar contraseña. Pendiente: verificación de correo, recuperación de
-  contraseña por email.
+  cuando lo asigna Google, vincular/desvincular Google desde el perfil, cambiar/
+  agregar/quitar contraseña, y verificación de correo por código de 6 dígitos.
+  Pendiente: recuperación de contraseña por email.
 
 Ver el [plan por fases](#plan-por-fases) completo abajo.
 
@@ -234,10 +234,18 @@ Cómo está montado:
   `has_google`), así que la app sabe de antemano qué campos/botones mostrar: el botón
   dice "Cambiar contraseña" o "Agregar contraseña" según corresponda, y "Quitar
   contraseña" solo aparece si hay contraseña **y** Google vinculado a la vez.
+- **Verificación de correo**: "soft" — no bloquea nada de la app, solo un aviso.
+  Código de 6 dígitos (no enlace) enviado por email, caduca en 2h, máximo 5 intentos
+  fallidos en una ventana móvil de 24h compartida entre códigos. Cuentas creadas por
+  Google llegan ya verificadas (el ID token lo confirma). En el perfil, una pastilla
+  "Sin verificar" junto al email abre una hoja para pedir/confirmar el código — no se
+  envía nada automáticamente al abrirla, para no invalidar un código que la persona ya
+  tuviera sin leer.
 
 Endpoints de auth: `register`, `login`, `refresh`, `logout`, `google`, `me` (`GET`/`PATCH`),
 `me/avatar` (`POST`/`DELETE`), `me/google` (`POST`/`DELETE`), `me/password`
-(`POST`/`DELETE`), `users` (`GET`, superadmin), `users/{id}` (`PATCH`, superadmin).
+(`POST`/`DELETE`), `verify-email/request`, `verify-email/confirm`, `users` (`GET`,
+superadmin), `users/{id}` (`PATCH`, superadmin).
 
 ---
 
@@ -343,7 +351,7 @@ API ya lo expone.
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva), logout. | ✅ Hecha |
 | **Identidad visual** | Logo, wordmark e icono propios. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, verificación de correo, recuperación por email. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez, vincular/desvincular desde perfil), cambiar/agregar/quitar contraseña ✅; pendiente: verificación de correo, recuperación por email |
+| **5 — Mejoras de autenticación** | Login con Google, cambio de contraseña, verificación de correo, recuperación por email. | 🚧 En marcha — login con Google (alta/login, conflicto de email, username editable una vez, vincular/desvincular desde perfil), cambiar/agregar/quitar contraseña, verificación de correo por código ✅; pendiente: recuperación por email |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

@@ -101,6 +101,7 @@ private struct ToursPlaceholderView: View {
         username: "rafatest",
         username_is_default: false,
         email: "rafa@example.com",
+        email_verified: true,
         theme_preference: .system,
         has_google: false,
         has_password: true,

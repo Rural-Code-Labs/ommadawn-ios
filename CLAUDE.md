@@ -44,8 +44,8 @@ con otra base de código.
   la app, perfil de usuario editable con avatar, gestión de administradores, edición
   completa del catálogo para admins, sello seleccionable) y **Fase 5 en marcha** (login con
   Google: alta/login básico, conflicto de email, nombre de usuario editable una sola vez
-  cuando lo asignó Google, vincular/desvincular Google desde el perfil, y cambiar/agregar/
-  quitar contraseña — ver más abajo).
+  cuando lo asignó Google, vincular/desvincular Google desde el perfil, cambiar/agregar/
+  quitar contraseña, y verificación de correo por código — ver más abajo).
   Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
@@ -250,6 +250,39 @@ Google. Probado en simulador y en dispositivo físico contra pre-producción.
     como antes (p. ej. mostrando otra vez el formulario de "poner contraseña por
     primera vez" después de ponerla). `AuthSession.changePassword`/`removePassword`
     llaman a `fetchProfile()` y actualizan `state` al terminar.
+- **Verificación de correo por código** (5.5, 6 ago 2026): "soft" — no bloquea nada de
+  la app, es solo un aviso en el perfil hasta que se verifica. Código de **6 dígitos**
+  (no enlace: así la API no tiene que servir ninguna página web, todo queda en JSON),
+  caduca en 2h, máximo **5 intentos fallidos en una ventana móvil de 24h** compartida
+  entre códigos (pedir uno nuevo no resetea el contador).
+  - **`email_verified`** en `User`: `true` desde el alta para cuentas de Google (ya
+    viene verificado en el ID token), `false` por defecto para las de contraseña.
+    Expuesto en `UserRead`.
+  - **`POST /auth/verify-email/request`** (autenticado): genera el código, invalida
+    cualquiera pendiente, lo manda por email. **`POST /auth/verify-email/confirm`**
+    (autenticado, body `{code}`): lo valida; `429` + `detail: "too_many_attempts"` si
+    se superan los 5 intentos en 24h (sin llegar a comprobar el código), `401` +
+    `detail: "invalid_code"` si no coincide o caducó.
+  - **`EmailVerificationError`**: mismo patrón que `PasswordChangeError` — el `401`
+    significa cosas distintas según el endpoint (al pedir código, sesión caducada; al
+    confirmarlo, código incorrecto), así que son dos casos separados
+    (`sessionExpired` / `invalidCode`) en vez de uno compartido.
+  - **`VerifyEmailView.swift`** (`Account/`): no manda el primer código
+    automáticamente al abrir la hoja — solo hay un botón "Enviar código". Como cada
+    envío invalida el anterior, auto-enviar al abrir haría que reabrir la hoja por
+    accidente (o solo para consultarla) inutilizara un código que la persona ya
+    tuviera sin leer en el correo. Tras pedirlo aparece el campo de 6 dígitos +
+    "Verificar" + "Reenviar código".
+  - **Aviso en el perfil**: pastilla "Sin verificar" + botón "Verificar" bajo el
+    email en `AccountProfileView`, solo si `!user.email_verified` (nunca para cuentas
+    de Google).
+  - **Backend de email en desarrollo**: `ConsoleEmailBackend` (en `ommadawn-api`)
+    escribe el email en el log en vez de enviarlo de verdad — no hay proveedor real
+    (SMTP/SendGrid) todavía. **Ojo**: el logger `app.email` no tenía ningún
+    `logging.basicConfig` que le diera un *handler*, así que sus líneas `INFO` se
+    generaban pero no llegaban a la consola (a diferencia de los logs de acceso, que
+    son de uvicorn y se configuran aparte) — hubo que arreglarlo en la API para poder
+    ver el código al probar en local.
 
 ### Backlog — Fase 4 (completa)
 
@@ -280,7 +313,7 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 | 5.2 | **Conflicto de email**: email de Google ya existente con contraseña → `409 email_conflict`, mensaje con sugerencia, sin auto-vincular ni duplicar. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.3 | **Vincular/desvincular Google desde el perfil**: botón "Conectar con Google" (mismo flujo SDK, llama a un endpoint de vinculación) y "Desconectar Google". Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.4 | **Cambiar/agregar/quitar contraseña**: hoja en `AccountProfileView` con contraseña actual (si aplica) + nueva + confirmación. Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
-| 5.5 | **Verificación de correo**: al registrarse, email de confirmación; cuenta pendiente hasta que verifica. | Pendiente | 🔴 API: campo `email_verified`, `POST /auth/verify-email/request` + `/confirm`; requiere servicio de email |
+| 5.5 | **Verificación de correo**: código de 6 dígitos por email, "soft" (no bloquea nada). Ver desglose abajo. | ✅ hecho (6 ago 2026) | ✅ |
 | 5.6 | **Recuperar contraseña** ("¿Olvidaste tu contraseña?"): flujo de reset por email — enlace de un solo uso para establecer nueva contraseña. | Pendiente | 🔴 API: `POST /auth/password-reset/request` + `POST /auth/password-reset/confirm`; requiere servicio de email |
 
 **Desglose de 5.1** (todo hecho el 6 ago 2026, ver también la sección "Login con Google" más arriba):
@@ -317,8 +350,18 @@ vive aparte, en el perfil, bajo control explícito del usuario ya autenticado.
 | 5.4.5 | Probado en simulador | app |
 | 5.4.6 | *(bonus, no estaba en el plan original)* `DELETE /auth/me/password` (quitarla, rechaza si no hay Google vinculado) + `has_password` en el perfil + botón "Quitar contraseña" | app + API |
 
-> 5.5 y 5.6 comparten infraestructura de email (proveedor SMTP o servicio transaccional) y
-> tiene sentido implementarlas juntas en el servidor cuando llegue su turno.
+**Desglose de 5.5** (todo hecho el 6 ago 2026):
+
+| # | Subtarea | Dónde |
+|---|---|---|
+| 5.5.1 | `POST /auth/verify-email/request` + `/confirm`: código de 6 dígitos, caduca en 2h, máximo 5 intentos fallidos en ventana móvil de 24h | `ommadawn-api` |
+| 5.5.2 | `AuthSession.requestEmailVerification()` + `confirmEmailVerification(code:)` | app |
+| 5.5.3 | `VerifyEmailView.swift` + pastilla "Sin verificar" en `AccountProfileView` | app |
+| 5.5.4 | Manejo de errores (`invalidCode`, `tooManyAttempts`, sesión caducada, servidor) | app |
+| 5.5.5 | Probado en simulador (incluye arreglar el logger `app.email`, que no llegaba a la consola en dev) | app + API |
+
+> 5.6 (recuperar contraseña) reutiliza la infraestructura de email que 5.5 ya deja
+> montada (proveedor SMTP o servicio transaccional en la API) — buen siguiente paso.
 
 ### Backlog — Fases futuras
 
@@ -531,6 +574,7 @@ ommadawn/
 │   │   ├── AccountMenu.swift          # Menú desplegable (nombre, apariencia, admin, logout)
 │   │   ├── AccountProfileView.swift   # Hoja de perfil: avatar + datos editables
 │   │   ├── ChangePasswordView.swift   # Cambiar/agregar contraseña
+│   │   ├── VerifyEmailView.swift      # Verificación de email por código de 6 dígitos
 │   │   ├── AccountAvatarView.swift    # Avatar circular reutilizable
 │   │   └── User+Presentation.swift    # displayName, avatarURL
 │   ├── Admin/                    # Gestión de administradores (solo superadmin)
@@ -668,7 +712,7 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **2 — Capa de red** | Paquete `OmmadawnAPI` con `swift-openapi-generator` + `openapi.json`, cliente base, config de base URL por entorno. Probado con `GET /health`. | ✅ Hecha |
 | **3 — Autenticación** | Registro/login, tokens en Keychain, renovación automática (reactiva + proactiva) con refresh + reintento. | ✅ Hecha |
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
-| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, verificación de correo y recuperación por email. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅, 5.3 vincular/desvincular desde perfil ✅, 5.4 cambiar/agregar/quitar contraseña ✅. Pendiente: 5.5 verificación de correo, 5.6 recuperar contraseña. |
+| **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, verificación de correo y recuperación por email. | 🚧 En marcha — 5.1 login/registro básico ✅, 5.2 conflicto de email ✅, 5.3 vincular/desvincular desde perfil ✅, 5.4 cambiar/agregar/quitar contraseña ✅, 5.5 verificación de correo ✅. Pendiente: 5.6 recuperar contraseña. |
 | **6 — Colecciones de ediciones** | Agrupar ediciones bajo un nombre de colección (cajas, ediciones multi-disco). | Pendiente |
 | **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
 | **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |

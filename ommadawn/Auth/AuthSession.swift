@@ -55,6 +55,21 @@ enum PasswordChangeError: Error {
     case network(Error)
 }
 
+/// Motivos por los que verificar el email puede fallar.
+///
+/// El `401` significa cosas distintas según el endpoint: al pedir el
+/// código no hay nada que comprobar salvo la sesión; al confirmarlo, un
+/// `401` es (casi siempre) el código incorrecto o caducado — de ahí dos
+/// casos separados en vez de uno compartido.
+enum EmailVerificationError: Error {
+    case sessionExpired    // 401 al pedir el código
+    case invalidCode       // 401 al confirmar — no coincide o ha caducado
+    case tooManyAttempts   // 429 — 5 intentos fallidos ya consumidos en 24h
+    case invalidData       // 422 — el código no tiene forma de 6 dígitos
+    case unexpected(Int)
+    case network(Error)
+}
+
 /// Motivos por los que un registro puede fallar.
 enum RegisterError: Error {
     case alreadyTaken             // 409 — usuario o email ya en uso
@@ -331,6 +346,52 @@ final class AuthSession {
             throw error
         } catch {
             throw PasswordChangeError.network(error)
+        }
+    }
+
+    /// Pide un código de verificación de 6 dígitos, enviado al email de la
+    /// cuenta. Invalida cualquier código pendiente anterior.
+    func requestEmailVerification() async throws {
+        do {
+            let output = try await client.request_email_verification_api_v1_auth_verify_email_request_post(.init())
+            switch output {
+            case .noContent:
+                return
+            case .unauthorized:
+                throw EmailVerificationError.sessionExpired
+            case .undocumented(let statusCode, _):
+                throw EmailVerificationError.unexpected(statusCode)
+            }
+        } catch let error as EmailVerificationError {
+            throw error
+        } catch {
+            throw EmailVerificationError.network(error)
+        }
+    }
+
+    /// Confirma el código recibido por email. Máximo 5 intentos fallidos en
+    /// una ventana móvil de 24h, compartida entre códigos.
+    func confirmEmailVerification(code: String) async throws {
+        do {
+            let output = try await client.confirm_email_verification_api_v1_auth_verify_email_confirm_post(
+                .init(body: .json(.init(code: code)))
+            )
+            switch output {
+            case .noContent:
+                state = .signedIn(try await fetchProfile())
+            case .unauthorized:
+                throw EmailVerificationError.invalidCode
+            case .tooManyRequests:
+                throw EmailVerificationError.tooManyAttempts
+            case .unprocessableContent:
+                throw EmailVerificationError.invalidData
+            case .undocumented(let statusCode, _):
+                throw EmailVerificationError.unexpected(statusCode)
+            }
+        } catch let error as EmailVerificationError {
+            throw error
+        } catch {
+            throw EmailVerificationError.network(error)
         }
     }
 
