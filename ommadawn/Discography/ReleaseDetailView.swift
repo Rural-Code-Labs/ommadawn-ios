@@ -48,12 +48,19 @@ struct ReleaseDetailView: View {
     // registrado si esta pantalla se abrió desde "Discos".
     @State private var selectedCollectionTag: CollectionTag?
 
+    // Foro (Fase 7)
+    @State private var showingReleaseForum = false
+    @State private var showingEditionForum = false
+    @State private var releaseOpenThreadCount: Int?
+    @State private var editionOpenThreadCount: Int?
+
     init(release: Release) {
         _release = State(initialValue: release)
         _selectedEditionID = State(initialValue: release.displayEdition?.id)
     }
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
+    private var forumStore: ForumStore { ForumStore(client: session.client) }
 
     private var isAdmin: Bool {
         guard case .signedIn(let user) = session.state else { return false }
@@ -140,6 +147,8 @@ struct ReleaseDetailView: View {
                                 Divider()
                                 CollapsibleMarkdownSection(title: "Notas", text: notes)
                             }
+                            Divider()
+                            forumLinks
                         }
                     }
                 }
@@ -153,6 +162,22 @@ struct ReleaseDetailView: View {
         }
         .navigationDestination(item: $selectedCollectionTag) { tag in
             CollectionDetailView(collectionID: tag.id, store: store)
+        }
+        .sheet(isPresented: $showingReleaseForum) {
+            ForumThreadListView(
+                store: forumStore,
+                entityType: .release,
+                entityId: release.id,
+                navigationTitle: "Discusión · \(release.title)"
+            )
+        }
+        .sheet(isPresented: $showingEditionForum) {
+            ForumThreadListView(
+                store: forumStore,
+                entityType: .edition,
+                entityId: selectedEdition?.id,
+                navigationTitle: "Discusión · \(editionTitle)"
+            )
         }
         .sheet(isPresented: $showingEditionList) {
             EditionListSheet(
@@ -371,6 +396,54 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
             }
         }
     }
+
+    /// Entradas al foro (Fase 7): un hilo sobre el disco en general y otro
+    /// sobre la edición activa, cada uno abre su propia lista de hilos, con
+    /// el número de hilos abiertos en ese momento.
+    private var forumLinks: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Discusión")
+                .font(.headline)
+            Button {
+                showingReleaseForum = true
+            } label: {
+                Label(discussionLabel("Discusiones del disco", count: releaseOpenThreadCount), systemImage: "bubble.left.and.bubble.right")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.tint)
+            Button {
+                showingEditionForum = true
+            } label: {
+                Label(discussionLabel("Discusiones de esta edición", count: editionOpenThreadCount), systemImage: "bubble.left.and.bubble.right")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(.tint)
+        }
+        .task { await loadForumCounts() }
+        .onChange(of: selectedEditionID) {
+            Task { editionOpenThreadCount = await loadEditionForumCountValue() }
+        }
+    }
+
+    private func discussionLabel(_ base: String, count: Int?) -> String {
+        guard let count else { return base }
+        return "\(base) (\(count))"
+    }
+
+    private func loadForumCounts() async {
+        async let releaseCount = try? forumStore.fetchThreads(entityType: .release, entityId: release.id, status: .open).count
+        async let editionCount = loadEditionForumCountValue()
+        releaseOpenThreadCount = await releaseCount
+        editionOpenThreadCount = await editionCount
+    }
+
+    private func loadEditionForumCountValue() async -> Int? {
+        guard let edition = selectedEdition else { return nil }
+        return try? await forumStore.fetchThreads(entityType: .edition, entityId: edition.id, status: .open).count
+    }
+
 
     private func tracklist(_ tracks: [Track]) -> some View {
         let sorted = tracks.sorted { a, b in

@@ -247,6 +247,20 @@ struct DynamicMarkdownWebView: UIViewRepresentable {
     }
 }
 
+/// Bloque de Markdown renderizado, siempre expandido (a diferencia de
+/// `CollapsibleMarkdownSection` en `ReleaseDetailView`, que se pliega tras un
+/// chevron) — para el cuerpo de un hilo del foro o un comentario, donde el
+/// texto ES el contenido principal, no un extra opcional.
+struct MarkdownBlock: View {
+    let text: String
+    @State private var height: CGFloat = 44
+
+    var body: some View {
+        DynamicMarkdownWebView(text: text, contentHeight: $height)
+            .frame(height: height)
+    }
+}
+
 // MARK: - WKWebView para Markdown
 
 struct MarkdownWebView: UIViewRepresentable {

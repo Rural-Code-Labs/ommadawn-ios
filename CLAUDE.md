@@ -48,8 +48,10 @@ con otra base de código.
   quitar contraseña, verificación de correo por código, y recuperación de contraseña por
   código), **Fase 6 hecha** (colecciones de ediciones: agrupar ediciones de discos
   distintos bajo un nombre, ej. "Remasterizaciones HDCD") y **Fase 7 en marcha** (foro
-  de discusión atado al catálogo + pestaña Inicio con casos abiertos — ver más abajo).
-  Ver plan abajo.
+  de discusión atado al catálogo, organizado en subforos — hoy solo "Discusiones" —,
+  textos en Markdown con el editor de la Fase 4; modelo y endpoints de la API listos,
+  hilos en el detalle de disco/edición en marcha; falta pestaña Inicio con casos
+  abiertos — ver más abajo). Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
 - **Edición de catálogo para admins (Fase 4, hecha en 3 capas, 30 jul 2026)**:
@@ -493,22 +495,56 @@ catálogo — la gente propone y discute, un admin decide qué aplicar **a mano*
 las pantallas de edición que ya existen. Mucho menos que construir, y de propina da
 discusión real entre varias personas antes de que el admin actúe.
 
-- **`ForumThread`**: título, cuerpo, autor, `entity_type` (nullable: `"release"` /
-  `"edition"` / `"discography"` general / futuros dominios como conciertos — y
-  también preparado para posts **sin tema**, aunque la app no lo exponga todavía) +
-  `entity_id`, estado (`open` / `resolved` / `closed`), `resolution_note` opcional.
+- **`Subforum`**: secciones del foro — `id`, `name` (único), `description`
+  opcional, `icon` (SF Symbol, opcional), `position` (orden manual). Hoy solo
+  existe uno, sembrado por migración: **"Discusiones"**. Pensado para poder añadir
+  más subforos en el futuro (ej. "Anuncios", "Ayuda") sin cambiar el modelo otra
+  vez. Sin CRUD de subforos desde la API todavía (con uno solo no hace falta).
+- **`ForumThread`**: título, cuerpo, autor, `subforum_id` (**obligatorio**: todo
+  hilo vive en un subforo) + `entity_type` (nullable: `"release"` / `"edition"` /
+  `"discography"` general / futuros dominios como conciertos — y también
+  preparado para posts **sin tema**, aunque la app no lo exponga todavía) +
+  `entity_id`, estado (`open` / `resolved` / `closed`), `resolution_note`
+  opcional. `subforum_id` y `entity_type`/`entity_id` son independientes entre sí:
+  el primero dice **dónde** vive el hilo, el segundo **a qué** se refiere dentro
+  de ese subforo (un futuro subforo "Anuncios" tendría hilos sin `entity_type`).
 - **`ForumComment`**: hilo, autor, cuerpo.
 - **Crear hilo o comentar exige `email_verified = true`** — mismo criterio de
   "soft" que el resto de la app (no bloquea nada más), pero participar en el foro sí
   requiere haber confirmado el email.
-- **Pestaña Inicio** nueva, primera en `RootTabView` (Inicio → Discografía → Tours),
-  con "Casos abiertos en el foro" de momento — noticias/actualizaciones quedan como
-  hueco visual para el futuro, sin construir todavía.
+- **Textos en Markdown**: el cuerpo de un hilo y de un comentario se escriben con
+  el mismo editor de la Fase 4 (`MarkdownEditorSection` + toolbar de negrita/
+  cursiva/enlace/lista/cita + cheatsheet + preview) y se muestran ya renderizados
+  con el nuevo `MarkdownBlock` (`Shared/MarkdownTextEditor.swift`) — una variante
+  siempre expandida de `DynamicMarkdownWebView`, a diferencia de
+  `CollapsibleMarkdownSection` (que se pliega tras un chevron): aquí el texto ES
+  el contenido principal, no un extra opcional.
+- **`ForumStore`** (`Forum/ForumStore.swift`): mismo patrón que `DiscographyStore`.
+  `fetchSubforums`, `fetchThreads(subforumId:entityType:entityId:status:)`,
+  `fetchThread(id:)`, `createThread(subforumId:title:body:entityType:entityId:)`,
+  `addComment(threadID:body:)`, `updateThreadStatus(id:status:resolutionNote:)`.
+  `ForumError` distingue `.sessionExpired` (401) de `.emailNotVerified` (403 al
+  crear/comentar) y `.forbidden` (403 al cambiar estado, no admin) — mismo criterio
+  que `PasswordChangeError`/`EmailVerificationError`: un mismo código HTTP significa
+  cosas distintas según el endpoint, así que son casos separados.
+- **Hilos en el detalle de disco/edición** (7.2, en marcha): sección "Discusión" en
+  `ReleaseDetailView`, con dos entradas — "Discusiones del disco (N)" y
+  "Discusiones de esta edición (N)" — donde N es el número de hilos **abiertos**
+  en ese momento (cargado con `fetchThreads(status: .open)` al aparecer la vista y
+  al cambiar de edición). Cada una abre `ForumThreadListView` como hoja (necesita
+  su propio `NavigationStack`, ya que una `.sheet` no hereda el de la vista que la
+  abre) filtrada por `entityType`/`entityId`. El subforo "Discusiones" se resuelve
+  una vez (`fetchSubforums().first`, hoy es el único) y se reutiliza tanto para
+  filtrar como para crear hilos nuevos (`subforum_id` es obligatorio al crear). El
+  botón de "+" para crear un hilo se deshabilita mientras el subforo no ha
+  cargado. `ForumThreadDetailView` muestra cabecera + cuerpo + comentarios, y un
+  compositor de comentario al final (oculto si el hilo no está `.open`).
+  `ForumThreadComposeView` es la hoja de crear hilo (título + `MarkdownEditorSection`).
 
 | # | Subtarea | Dónde | Estado |
 |---|---|---|---|
-| 7.1 | Modelo `ForumThread`/`ForumComment` + endpoints (crear, listar/filtrar, comentar, cambiar estado) | `ommadawn-api` | En marcha |
-| 7.2 | Hilos del foro en el detalle de disco/edición (listar, crear, comentar) | app | Pendiente |
+| 7.1 | Modelo `Subforum`/`ForumThread`/`ForumComment` + endpoints (subforos, crear, listar/filtrar, comentar, cambiar estado) | `ommadawn-api` | ✅ hecho (8 ago 2026) |
+| 7.2 | Hilos del foro en el detalle de disco/edición (listar, crear, comentar) | app | En marcha |
 | 7.3 | Hilos generales de Discografía (sin disco concreto) | app | Pendiente |
 | 7.4 | Admin: resolver/cerrar un hilo | app | Pendiente |
 | 7.5 | Pestaña Inicio con casos abiertos del foro | app | Pendiente |
@@ -745,6 +781,12 @@ ommadawn/
 │   │   ├── CollectionListView.swift     # listado de colecciones + CollectionFormView (crear/editar)
 │   │   ├── CollectionDetailView.swift
 │   │   └── CollectionTagPickerView.swift # multi-selección de colecciones para una edición
+│   ├── Forum/                     # Fase 7: foro de discusión (subforos + hilos + comentarios)
+│   │   ├── ForumStore.swift
+│   │   ├── Forum+Presentation.swift      # displayName/tintColor de estado y tipo de entidad
+│   │   ├── ForumThreadListView.swift     # lista de hilos de un subforo/entidad + crear
+│   │   ├── ForumThreadDetailView.swift   # hilo + comentarios + compositor de comentario
+│   │   └── ForumThreadComposeView.swift  # hoja de crear hilo
 │   ├── Shared/                   # Componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + NSLocale.isoCountryCodes + extraCodes
 │   │   ├── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador
