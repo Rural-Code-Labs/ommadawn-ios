@@ -333,8 +333,9 @@ API ya lo expone.
 | **4 — Discografía** | Listado (grid/lista, filtro, orden) y detalle con tracklist; cabecera con avatar y engranaje de ajustes; perfil editable con avatar y país; apariencia sincronizada con el servidor; gestión de administradores; pantalla "Acerca de"; edición completa del catálogo para admins (descripción/créditos/notas en Markdown con preview, imágenes con ↑↓, filtros multi-selección con banderas, sello discográfico seleccionable). | ✅ Hecha |
 | **5 — Mejoras de autenticación** | Login con Google (SDK oficial, conflicto de email sin auto-vincular), username editable una sola vez cuando lo asigna Google, vincular/desvincular Google desde el perfil, cambiar/agregar/quitar contraseña, verificación de correo y recuperación de contraseña — estas dos últimas por código de 6 dígitos, no por enlace. | ✅ Hecha |
 | **6 — Colecciones de ediciones** | Agrupar ediciones de discos distintos bajo un nombre común (ej. "Remasterizaciones HDCD"), no cajas físicas de un mismo álbum (eso ya es un disco normal). Segmented Discos/Colecciones en la pestaña Discografía, tags al editar una edición (buscar o crear), enlace inverso "Parte de: X", gestión completa para admins. | ✅ Hecha |
-| **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
-| **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
-| **9 — Conciertos** | Giras, fechas, setlists. | Pendiente |
-| **10 — Libros** | Bibliografía. | Pendiente |
+| **7 — Foro / contribuciones** | Foro de discusión atado al catálogo (discos, ediciones, discografía en general, y futuros dominios); solo un admin aplica los cambios. Pestaña Inicio con casos abiertos. | 🚧 En marcha |
+| **8 — Valoración de discos** | Puntuar discos/ediciones. | Pendiente |
+| **9 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
+| **10 — Conciertos** | Giras, fechas, setlists. | Pendiente |
+| **11 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar. | Pendiente |

@@ -46,8 +46,9 @@ con otra base de código.
   Google: alta/login básico, conflicto de email, nombre de usuario editable una sola vez
   cuando lo asignó Google, vincular/desvincular Google desde el perfil, cambiar/agregar/
   quitar contraseña, verificación de correo por código, y recuperación de contraseña por
-  código) y **Fase 6 hecha** (colecciones de ediciones: agrupar ediciones de discos
-  distintos bajo un nombre, ej. "Remasterizaciones HDCD" — ver más abajo).
+  código), **Fase 6 hecha** (colecciones de ediciones: agrupar ediciones de discos
+  distintos bajo un nombre, ej. "Remasterizaciones HDCD") y **Fase 7 en marcha** (foro
+  de discusión atado al catálogo + pestaña Inicio con casos abiertos — ver más abajo).
   Ver plan abajo.
 - **Bundle id**: `com.ruralcodelabs.ommadawn`. Deployment target 26.5 (solo iOS: iPhone/iPad),
   Swift 5, Xcode 26.
@@ -484,12 +485,43 @@ Ver también la sección "Colecciones de ediciones" más arriba.
 > en la ronda inicial de 6.1 — mismo patrón que `has_google`/`has_password` en la Fase 5:
 > se detecta el hueco al implementar la UI que lo necesita, no antes.
 
+### Backlog — Fase 7: Foro / contribuciones (en marcha, 8 ago 2026)
+
+Replanteada respecto a la idea original ("sistema estructurado de propuestas con
+diffs y aprobación automática"): en vez de eso, un **foro de discusión** atado al
+catálogo — la gente propone y discute, un admin decide qué aplicar **a mano**, con
+las pantallas de edición que ya existen. Mucho menos que construir, y de propina da
+discusión real entre varias personas antes de que el admin actúe.
+
+- **`ForumThread`**: título, cuerpo, autor, `entity_type` (nullable: `"release"` /
+  `"edition"` / `"discography"` general / futuros dominios como conciertos — y
+  también preparado para posts **sin tema**, aunque la app no lo exponga todavía) +
+  `entity_id`, estado (`open` / `resolved` / `closed`), `resolution_note` opcional.
+- **`ForumComment`**: hilo, autor, cuerpo.
+- **Crear hilo o comentar exige `email_verified = true`** — mismo criterio de
+  "soft" que el resto de la app (no bloquea nada más), pero participar en el foro sí
+  requiere haber confirmado el email.
+- **Pestaña Inicio** nueva, primera en `RootTabView` (Inicio → Discografía → Tours),
+  con "Casos abiertos en el foro" de momento — noticias/actualizaciones quedan como
+  hueco visual para el futuro, sin construir todavía.
+
+| # | Subtarea | Dónde | Estado |
+|---|---|---|---|
+| 7.1 | Modelo `ForumThread`/`ForumComment` + endpoints (crear, listar/filtrar, comentar, cambiar estado) | `ommadawn-api` | En marcha |
+| 7.2 | Hilos del foro en el detalle de disco/edición (listar, crear, comentar) | app | Pendiente |
+| 7.3 | Hilos generales de Discografía (sin disco concreto) | app | Pendiente |
+| 7.4 | Admin: resolver/cerrar un hilo | app | Pendiente |
+| 7.5 | Pestaña Inicio con casos abiertos del foro | app | Pendiente |
+| 7.6 | Probado en simulador | app | Pendiente |
+
 ### Backlog — Fases futuras
 
 | Fase | Contenido | Requiere API |
 |---|---|---|
-| **7** | **Contribuciones de usuarios normales**: cualquier usuario puede proponer cambios al catálogo; un admin los aprueba/rechaza. | 🔴 API: modelo `Contribution`, endpoints de envío y revisión |
-| **8** | **Colección personal**: cada usuario marca qué ediciones tiene, con estado del disco y la funda (escala Discogs: Mint / NM / VG+ / VG / G / F / P). Vista de colección propia + botón en detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
+| **8** | **Valoración de discos**: puntuar discos/ediciones. Sin definir todavía — primera vez que se aborda. | 🔴 Sin definir |
+| **9** | **Colección personal**: cada usuario marca qué ediciones tiene, con estado del disco y la funda (escala Discogs: Mint / NM / VG+ / VG / G / F / P). Vista de colección propia + botón en detalle de edición. | 🔴 API: modelo `CollectionEntry` (user, edition, disc_condition, sleeve_condition, notas), endpoints `GET/POST /collection`, `PATCH/DELETE /collection/{id}` |
+| **10** | **Conciertos**: giras, fechas, setlists. | 🔴 Sin definir todavía |
+| **11** | **Libros**: bibliografía. | 🔴 Sin definir todavía |
 
 ---
 
@@ -838,8 +870,9 @@ detrás de la API: cada dominio se consume cuando la API ya lo expone.
 | **4 — Discografía** | Listado y detalle de discos, edición completa para admins. | ✅ Hecha |
 | **5 — Mejoras de autenticación** | Login con Google (SDK oficial + vinculación de cuenta), cambio de contraseña, verificación de correo y recuperación por email. | ✅ Hecha |
 | **6 — Colecciones de ediciones** | Agrupar ediciones de discos distintos bajo un nombre común (ej. "Remasterizaciones HDCD"). | ✅ Hecha |
-| **7 — Contribuciones** | Usuarios proponen cambios al catálogo; admins aprueban/rechazan. | Pendiente |
-| **8 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
-| **9 — Conciertos** | Giras, fechas, setlists. | Pendiente |
-| **10 — Libros** | Bibliografía. | Pendiente |
+| **7 — Foro / contribuciones** | Foro de discusión atado al catálogo (discos, ediciones, discografía en general, y futuros dominios); solo un admin aplica los cambios. Pestaña Inicio con casos abiertos. | 🚧 En marcha |
+| **8 — Valoración de discos** | Puntuar discos/ediciones. | Pendiente |
+| **9 — Colección personal** | Cada usuario registra las ediciones que tiene, con estado de disco y funda (escala Discogs). | Pendiente |
+| **10 — Conciertos** | Giras, fechas, setlists. | Pendiente |
+| **11 — Libros** | Bibliografía. | Pendiente |
 | **Siguientes** | Otras secciones a acordar con el usuario. | Pendiente |
