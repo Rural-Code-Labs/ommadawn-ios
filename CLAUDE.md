@@ -540,6 +540,24 @@ discusión real entre varias personas antes de que el admin actúe.
   cargado. `ForumThreadDetailView` muestra cabecera + cuerpo + comentarios, y un
   compositor de comentario al final (oculto si el hilo no está `.open`).
   `ForumThreadComposeView` es la hoja de crear hilo (título + `MarkdownEditorSection`).
+- **Admin: resolver/cerrar/reabrir un hilo** (7.4, 9 ago 2026): menú `⋯` en la
+  toolbar de `ForumThreadDetailView`, solo visible a admins. En un hilo `.open`:
+  "Marcar como resuelto" (abre `ForumResolveSheet`, nota de resolución opcional,
+  ej. "Aplicado en la edición X") o "Cerrar hilo" (`confirmationDialog`, sin nota).
+  En un hilo `.resolved`/`.closed`: "Reabrir hilo". Hoy ambos estados bloquean
+  comentarios nuevos por igual (`if thread.status == .open` gatea el compositor);
+  la diferencia entre "resuelto" y "cerrado" es solo semántica (hubo una acción
+  concreta derivada del hilo vs. se corta sin resultado) más la nota opcional,
+  sin distinto comportamiento todavía.
+  **Contador "Abiertas/Totales"**: `forumLinks` en `ReleaseDetailView` cambió de
+  mostrar solo el número de abiertas a mostrar `(abiertas/totales)`, ej.
+  "Discusiones del disco (0/2)", con la cabecera de la sección explicando el
+  formato ("Discusiones (Abiertas/Totales)"). `loadCounts(entityType:entityId:)`
+  pide ambos números en paralelo (`async let`). Los `.sheet` de
+  `showingReleaseForum`/`showingEditionForum` ganan `onDismiss` para recalcular
+  el contador al volver — si no, al resolver/cerrar un hilo y salir de la hoja,
+  el número se quedaba con el valor cargado al entrar (no había nada que lo
+  refrescara).
 - **Discusión general de discografía** (7.3): en `ReleaseListView`, cápsula flotante
   independiente en la esquina inferior **izquierda** (separada de la de buscar/
   filtrar/vista, que sigue a la derecha — no son la misma familia de controles) con
@@ -552,7 +570,7 @@ discusión real entre varias personas antes de que el admin actúe.
 | 7.1 | Modelo `Subforum`/`ForumThread`/`ForumComment` + endpoints (subforos, crear, listar/filtrar, comentar, cambiar estado) | `ommadawn-api` | ✅ hecho (8 ago 2026) |
 | 7.2 | Hilos del foro en el detalle de disco/edición (listar, crear, comentar) | app | ✅ hecho (9 ago 2026) |
 | 7.3 | Hilos generales de Discografía (sin disco concreto) | app | ✅ hecho (9 ago 2026) |
-| 7.4 | Admin: resolver/cerrar un hilo | app | Pendiente |
+| 7.4 | Admin: resolver/cerrar un hilo | app | ✅ hecho (9 ago 2026) |
 | 7.5 | Pestaña Inicio con casos abiertos del foro | app | Pendiente |
 | 7.6 | Poder agregar imágenes en el foro (hilos y comentarios) | app + API | Pendiente |
 | 7.7 | Probado en simulador | app | Pendiente |

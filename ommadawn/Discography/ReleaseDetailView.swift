@@ -51,8 +51,8 @@ struct ReleaseDetailView: View {
     // Foro (Fase 7)
     @State private var showingReleaseForum = false
     @State private var showingEditionForum = false
-    @State private var releaseOpenThreadCount: Int?
-    @State private var editionOpenThreadCount: Int?
+    @State private var releaseThreadCounts: (open: Int, total: Int)?
+    @State private var editionThreadCounts: (open: Int, total: Int)?
 
     init(release: Release) {
         _release = State(initialValue: release)
@@ -163,7 +163,9 @@ struct ReleaseDetailView: View {
         .navigationDestination(item: $selectedCollectionTag) { tag in
             CollectionDetailView(collectionID: tag.id, store: store)
         }
-        .sheet(isPresented: $showingReleaseForum) {
+        .sheet(isPresented: $showingReleaseForum, onDismiss: {
+            Task { releaseThreadCounts = await loadCounts(entityType: .release, entityId: release.id) }
+        }) {
             ForumThreadListView(
                 store: forumStore,
                 entityType: .release,
@@ -171,7 +173,9 @@ struct ReleaseDetailView: View {
                 navigationTitle: "Discusión · \(release.title)"
             )
         }
-        .sheet(isPresented: $showingEditionForum) {
+        .sheet(isPresented: $showingEditionForum, onDismiss: {
+            Task { editionThreadCounts = await loadEditionForumCounts() }
+        }) {
             ForumThreadListView(
                 store: forumStore,
                 entityType: .edition,
@@ -399,15 +403,15 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
 
     /// Entradas al foro (Fase 7): un hilo sobre el disco en general y otro
     /// sobre la edición activa, cada uno abre su propia lista de hilos, con
-    /// el número de hilos abiertos en ese momento.
+    /// el número de hilos abiertos sobre el total (ej. "0/2").
     private var forumLinks: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Discusión")
+            Text("Discusiones (Abiertas/Totales)")
                 .font(.headline)
             Button {
                 showingReleaseForum = true
             } label: {
-                Label(discussionLabel("Discusiones del disco", count: releaseOpenThreadCount), systemImage: "bubble.left.and.bubble.right")
+                Label(discussionLabel("Discusiones del disco", counts: releaseThreadCounts), systemImage: "bubble.left.and.bubble.right")
                     .font(.subheadline)
             }
             .buttonStyle(.plain)
@@ -415,7 +419,7 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
             Button {
                 showingEditionForum = true
             } label: {
-                Label(discussionLabel("Discusiones de esta edición", count: editionOpenThreadCount), systemImage: "bubble.left.and.bubble.right")
+                Label(discussionLabel("Discusiones de esta edición", counts: editionThreadCounts), systemImage: "bubble.left.and.bubble.right")
                     .font(.subheadline)
             }
             .buttonStyle(.plain)
@@ -423,25 +427,32 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
         }
         .task { await loadForumCounts() }
         .onChange(of: selectedEditionID) {
-            Task { editionOpenThreadCount = await loadEditionForumCountValue() }
+            Task { editionThreadCounts = await loadEditionForumCounts() }
         }
     }
 
-    private func discussionLabel(_ base: String, count: Int?) -> String {
-        guard let count else { return base }
-        return "\(base) (\(count))"
+    private func discussionLabel(_ base: String, counts: (open: Int, total: Int)?) -> String {
+        guard let counts else { return base }
+        return "\(base) (\(counts.open)/\(counts.total))"
     }
 
     private func loadForumCounts() async {
-        async let releaseCount = try? forumStore.fetchThreads(entityType: .release, entityId: release.id, status: .open).count
-        async let editionCount = loadEditionForumCountValue()
-        releaseOpenThreadCount = await releaseCount
-        editionOpenThreadCount = await editionCount
+        async let releaseCounts = loadCounts(entityType: .release, entityId: release.id)
+        async let editionCounts = loadEditionForumCounts()
+        releaseThreadCounts = await releaseCounts
+        editionThreadCounts = await editionCounts
     }
 
-    private func loadEditionForumCountValue() async -> Int? {
+    private func loadEditionForumCounts() async -> (open: Int, total: Int)? {
         guard let edition = selectedEdition else { return nil }
-        return try? await forumStore.fetchThreads(entityType: .edition, entityId: edition.id, status: .open).count
+        return await loadCounts(entityType: .edition, entityId: edition.id)
+    }
+
+    private func loadCounts(entityType: ForumEntityType, entityId: Int) async -> (open: Int, total: Int)? {
+        async let open = try? forumStore.fetchThreads(entityType: entityType, entityId: entityId, status: .open).count
+        async let total = try? forumStore.fetchThreads(entityType: entityType, entityId: entityId).count
+        guard let openCount = await open, let totalCount = await total else { return nil }
+        return (openCount, totalCount)
     }
 
 

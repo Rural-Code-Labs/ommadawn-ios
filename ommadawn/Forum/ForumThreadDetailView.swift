@@ -13,6 +13,8 @@ struct ForumThreadDetailView: View {
     let threadID: Int
     let store: ForumStore
 
+    @Environment(AuthSession.self) private var session
+
     @State private var thread: ForumThreadDetail?
     @State private var isLoading = false
     @State private var loadErrorMessage: String?
@@ -24,11 +26,85 @@ struct ForumThreadDetailView: View {
     @State private var showingVerifyEmail = false
     @State private var showingCheatsheet = false
 
+    // Admin: resolver/cerrar/reabrir (7.4)
+    @State private var showingResolveSheet = false
+    @State private var showingCloseConfirm = false
+    @State private var showingReopenConfirm = false
+    @State private var isUpdatingStatus = false
+    @State private var statusErrorMessage: String?
+
+    private var isAdmin: Bool {
+        guard case .signedIn(let user) = session.state else { return false }
+        return user.is_admin
+    }
+
     var body: some View {
         content
             .navigationTitle(thread?.title ?? "Hilo")
             .navigationBarTitleDisplayMode(.inline)
             .task { await load() }
+            .toolbar {
+                if isAdmin, let thread {
+                    ToolbarItem(placement: .primaryAction) {
+                        Menu {
+                            if thread.status == .open {
+                                Button {
+                                    showingResolveSheet = true
+                                } label: {
+                                    Label("Marcar como resuelto", systemImage: "checkmark.circle")
+                                }
+                                Button(role: .destructive) {
+                                    showingCloseConfirm = true
+                                } label: {
+                                    Label("Cerrar hilo", systemImage: "lock")
+                                }
+                            } else {
+                                Button {
+                                    showingReopenConfirm = true
+                                } label: {
+                                    Label("Reabrir hilo", systemImage: "lock.open")
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .disabled(isUpdatingStatus)
+                    }
+                }
+            }
+            .confirmationDialog(
+                "¿Cerrar este hilo?",
+                isPresented: $showingCloseConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Cerrar hilo", role: .destructive) {
+                    Task { await updateStatus(.closed) }
+                }
+            } message: {
+                Text("Ya no admitirá comentarios nuevos.")
+            }
+            .confirmationDialog(
+                "¿Reabrir este hilo?",
+                isPresented: $showingReopenConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Reabrir hilo") {
+                    Task { await updateStatus(.open) }
+                }
+            }
+            .sheet(isPresented: $showingResolveSheet) {
+                ForumResolveSheet { note in
+                    Task { await updateStatus(.resolved, resolutionNote: note) }
+                }
+            }
+            .alert("No se pudo actualizar el hilo", isPresented: Binding(
+                get: { statusErrorMessage != nil },
+                set: { if !$0 { statusErrorMessage = nil } }
+            )) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(statusErrorMessage ?? "")
+            }
     }
 
     @ViewBuilder
@@ -123,6 +199,45 @@ struct ForumThreadDetailView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            if let note = thread.resolution_note, !note.isEmpty {
+                Text(note)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 2)
+            }
+        }
+    }
+
+    private struct ForumResolveSheet: View {
+        let onConfirm: (String?) -> Void
+
+        @Environment(\.dismiss) private var dismiss
+        @State private var note = ""
+
+        var body: some View {
+            NavigationStack {
+                Form {
+                    Section {
+                        TextField("Nota de resolución (opcional)", text: $note, axis: .vertical)
+                    } footer: {
+                        Text("Se muestra junto al hilo, ej. \"Aplicado en la edición X\".")
+                    }
+                }
+                .navigationTitle("Marcar como resuelto")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancelar") { dismiss() }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Resolver") {
+                            let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+                            onConfirm(trimmed.isEmpty ? nil : trimmed)
+                            dismiss()
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -143,6 +258,21 @@ struct ForumThreadDetailView: View {
             thread = try await store.fetchThread(id: threadID)
         } catch {
             loadErrorMessage = "Comprueba tu conexión e inténtalo de nuevo."
+        }
+    }
+
+    private func updateStatus(_ status: ForumThreadStatus, resolutionNote: String? = nil) async {
+        statusErrorMessage = nil
+        isUpdatingStatus = true
+        defer { isUpdatingStatus = false }
+        do {
+            thread = try await store.updateThreadStatus(id: threadID, status: status, resolutionNote: resolutionNote)
+        } catch ForumError.sessionExpired {
+            statusErrorMessage = "Tu sesión ha caducado. Vuelve a entrar e inténtalo de nuevo."
+        } catch ForumError.forbidden {
+            statusErrorMessage = "No tienes permiso para cambiar el estado de este hilo."
+        } catch {
+            statusErrorMessage = "Inténtalo de nuevo."
         }
     }
 
