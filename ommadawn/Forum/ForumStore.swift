@@ -18,6 +18,9 @@ enum ForumError: Error {
     case subforumRestricted // 403 al crear un hilo — el subforo es admin_only y no eres admin
     case forbidden         // 403 al cambiar el estado — no es admin
     case invalidData       // 422 — p. ej. entity_id no corresponde a ningún disco/edición
+    case nameTaken         // 409 al crear/editar un subforo — ya existe uno con ese nombre
+    case subforumHasThreads // 409 al borrar un subforo — no está vacío
+    case atEdge            // 400 al reordenar — ya está en el extremo
     case unexpected(Int)
     case network(Error)
 }
@@ -124,6 +127,85 @@ struct ForumStore {
             case .created(let r): return try r.body.json
             case .unauthorized: throw ForumError.sessionExpired
             case .forbidden: throw ForumError.emailNotVerified
+            case .notFound: throw ForumError.notFound
+            case .unprocessableContent: throw ForumError.invalidData
+            case .undocumented(let c, _): throw ForumError.unexpected(c)
+            }
+        } catch let e as ForumError { throw e }
+        catch { throw ForumError.network(error) }
+    }
+
+    /// Crea un subforo (solo admin). `position` se asigna automáticamente al
+    /// final — no se manda en el body.
+    func createSubforum(name: String, description: String?, icon: String?, adminOnly: Bool) async throws -> SubforumSummary {
+        do {
+            let output = try await client.create_subforum_api_v1_forum_subforums_post(
+                .init(body: .json(.init(name: name, description: description, icon: icon, admin_only: adminOnly)))
+            )
+            switch output {
+            case .created(let r): return try r.body.json
+            case .unauthorized: throw ForumError.sessionExpired
+            case .forbidden: throw ForumError.forbidden
+            case .conflict: throw ForumError.nameTaken
+            case .unprocessableContent: throw ForumError.invalidData
+            case .undocumented(let c, _): throw ForumError.unexpected(c)
+            }
+        } catch let e as ForumError { throw e }
+        catch { throw ForumError.network(error) }
+    }
+
+    /// Edita nombre/descripción/icono/`admin_only` de un subforo (solo
+    /// admin). PATCH parcial: los parámetros `nil` no se tocan.
+    func updateSubforum(id: Int, name: String? = nil, description: String? = nil, icon: String? = nil, adminOnly: Bool? = nil) async throws -> SubforumSummary {
+        do {
+            let output = try await client.update_subforum_api_v1_forum_subforums__subforum_id__patch(
+                .init(path: .init(subforum_id: id), body: .json(.init(name: name, description: description, icon: icon, admin_only: adminOnly)))
+            )
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .unauthorized: throw ForumError.sessionExpired
+            case .forbidden: throw ForumError.forbidden
+            case .notFound: throw ForumError.notFound
+            case .conflict: throw ForumError.nameTaken
+            case .unprocessableContent: throw ForumError.invalidData
+            case .undocumented(let c, _): throw ForumError.unexpected(c)
+            }
+        } catch let e as ForumError { throw e }
+        catch { throw ForumError.network(error) }
+    }
+
+    /// Borra un subforo (solo admin, y solo si no tiene ningún hilo).
+    func deleteSubforum(id: Int) async throws {
+        do {
+            let output = try await client.delete_subforum_api_v1_forum_subforums__subforum_id__delete(
+                .init(path: .init(subforum_id: id))
+            )
+            switch output {
+            case .noContent: return
+            case .unauthorized: throw ForumError.sessionExpired
+            case .forbidden: throw ForumError.forbidden
+            case .notFound: throw ForumError.notFound
+            case .conflict: throw ForumError.subforumHasThreads
+            case .unprocessableContent: throw ForumError.invalidData
+            case .undocumented(let c, _): throw ForumError.unexpected(c)
+            }
+        } catch let e as ForumError { throw e }
+        catch { throw ForumError.network(error) }
+    }
+
+    /// Mueve un subforo un puesto arriba o abajo (solo admin). Devuelve la
+    /// lista completa ya reordenada, mismo patrón que mover una imagen de
+    /// edición en discografía.
+    func moveSubforum(id: Int, direction: Components.Schemas.SubforumMoveRequest.directionPayload) async throws -> [SubforumSummary] {
+        do {
+            let output = try await client.move_subforum_api_v1_forum_subforums__subforum_id__position_patch(
+                .init(path: .init(subforum_id: id), body: .json(.init(direction: direction)))
+            )
+            switch output {
+            case .ok(let r): return try r.body.json
+            case .badRequest: throw ForumError.atEdge
+            case .unauthorized: throw ForumError.sessionExpired
+            case .forbidden: throw ForumError.forbidden
             case .notFound: throw ForumError.notFound
             case .unprocessableContent: throw ForumError.invalidData
             case .undocumented(let c, _): throw ForumError.unexpected(c)

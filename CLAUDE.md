@@ -618,6 +618,35 @@ discusión real entre varias personas antes de que el admin actúe.
     (`fetchSubforums`), cada fila con icono/nombre/descripción; entrar en uno
     empuja `ForumThreadListView(subforumId:showsCloseButton: false)` dentro del
     mismo `NavigationStack` (no como hoja aparte).
+- **Admin: gestión de subforos** (7.6, 9 ago 2026): CRUD completo desde
+  `SubforumListView`, solo visible a admins. Botón "+" en la toolbar
+  (`SubforumFormView`, mismo patrón unificado crear/editar que
+  `CollectionFormView`). Menú `⋯` por fila (no un swipe action, para no
+  competir con el gesto de scroll): "Editar", "Subir"/"Bajar" (llaman a
+  `PATCH .../position`, mismo patrón que reordenar imágenes de edición —
+  devuelve la lista completa ya reordenada) y "Eliminar" (deshabilitado si
+  `thread_count > 0`, `confirmationDialog` + `.alert` para el error si el
+  borrado falla). `ForumStore` gana `createSubforum`/`updateSubforum`/
+  `deleteSubforum`/`moveSubforum`, y `ForumError` gana `.nameTaken` (409 en
+  crear/editar), `.subforumHasThreads` (409 en borrar) y `.atEdge` (400 al
+  reordenar en el extremo) — tres 409/400 con motivos distintos según el
+  endpoint, mismo criterio que el resto de la app.
+  - **`Shared/SFSymbolPickerView.swift`** (nuevo, reutilizable): selector
+    visual de icono con buscador (`.searchable`), lista curada de ~70 SF
+    Symbols relevantes (no el catálogo completo — no hay forma de
+    enumerarlo sin la app SF Symbols). Sustituye a un `TextField` libre en
+    `SubforumFormView`: escribir el nombre exacto a mano era propenso a
+    error (typos, autocapitalización rompiendo el nombre del símbolo) y
+    hacía parecer que "editar el icono no funcionaba".
+  - **Bug corregido**: al crear un subforo nuevo no aparecía en la lista
+    hasta refrescar a mano. Causa: `SubforumFormView(store: store) { created
+    in ... }` usaba trailing closure con dos parámetros de cierre
+    (`onCreated`/`onUpdated`) — el trailing closure se engancha siempre al
+    **último** parámetro, así que ese código en realidad rellenaba
+    `onUpdated`, nunca `onCreated`. Mismo error ya visto una vez con
+    `CollectionFormView` (Fase 6): con más de un parámetro de tipo closure,
+    usar la etiqueta explícita (`onCreated: { ... }`) en vez de trailing
+    closure.
 - **Discusión general de discografía** (7.3): en `ReleaseListView`, cápsula flotante
   independiente en la esquina inferior **izquierda** (separada de la de buscar/
   filtrar/vista, que sigue a la derecha — no son la misma familia de controles) con
@@ -632,9 +661,10 @@ discusión real entre varias personas antes de que el admin actúe.
 | 7.3 | Hilos generales de Discografía (sin disco concreto) | app | ✅ hecho (9 ago 2026) |
 | 7.4 | Admin: resolver/cerrar un hilo | app | ✅ hecho (9 ago 2026) |
 | 7.5 | Pestaña Inicio con casos abiertos del foro | app | ✅ hecho (9 ago 2026) |
-| 7.6 | Admin: gestión de subforos (orden, icono, nombre, crear, borrar) | app + API | En marcha |
-| 7.7 | Poder agregar imágenes en el foro (hilos y comentarios) | app + API | Pendiente |
-| 7.8 | Probado en simulador | app | Pendiente |
+| 7.6 | Admin: gestión de subforos (orden, icono, nombre, crear, borrar) | app + API | ✅ hecho (9 ago 2026) |
+| 7.7 | Poder fijar novedades en la ventana principal | app + API | Pendiente |
+| 7.8 | Poder agregar imágenes en el foro (hilos y comentarios) | app + API | Pendiente |
+| 7.9 | Probado en simulador | app | Pendiente |
 
 ### Backlog — Fases futuras
 
@@ -885,7 +915,8 @@ ommadawn/
 │   │   ├── GoogleMark.swift           # la "G" en degradado (botón de login + icono en perfil)
 │   │   ├── UIApplication+TopViewController.swift # presentar el navegador embebido del SDK de Google
 │   │   ├── MarkdownTextEditor.swift   # UITextView + MarkdownEditorController + MarkdownEditorSection
-│   │   └── MarkdownCheatsheetView.swift # referencia rápida de sintaxis Markdown
+│   │   ├── MarkdownCheatsheetView.swift # referencia rápida de sintaxis Markdown
+│   │   └── SFSymbolPickerView.swift   # selector visual de icono (SF Symbol) con buscador
 │   ├── Design/
 │   │   ├── BrandMark.swift      # el logo "O" en Didot Italic como vista reutilizable
 │   │   ├── AppTheme.swift       # AppTheme + extensión apiValue/init(from:) para sincronizar con API
