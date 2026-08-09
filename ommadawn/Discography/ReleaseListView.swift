@@ -61,8 +61,10 @@ struct ReleaseListView: View {
     @State private var showingCreateCollection = false
     @State private var searchText = ""
     @State private var isSearching = false
+    @State private var showingGeneralForum = false
 
     private var store: DiscographyStore { DiscographyStore(client: session.client) }
+    private var forumStore: ForumStore { ForumStore(client: session.client) }
 
     private var isAdmin: Bool {
         guard case .signedIn(let user) = session.state else { return false }
@@ -103,8 +105,11 @@ struct ReleaseListView: View {
         }
         .animation(.snappy, value: isSearching)
         .toolbar(.hidden, for: .navigationBar)
+        .overlay(alignment: .bottomLeading) {
+            leftFloatingControls
+        }
         .overlay(alignment: .bottomTrailing) {
-            floatingControls
+            rightFloatingControls
         }
             .task(id: typeFilter) {
                 await load()
@@ -122,6 +127,14 @@ struct ReleaseListView: View {
                         sample_cover_urls: []
                     ))
                 })
+            }
+            .sheet(isPresented: $showingGeneralForum) {
+                ForumThreadListView(
+                    store: forumStore,
+                    entityType: .discography,
+                    entityId: nil,
+                    navigationTitle: "Discusión general"
+                )
             }
     }
 
@@ -223,12 +236,11 @@ struct ReleaseListView: View {
         .padding(.vertical, 8)
     }
 
-    /// Filtro/orden y cambio de vista, flotantes sobre el contenido cerca
-    /// del borde inferior derecho, uno encima del otro. Si el usuario es
-    /// admin, añade un botón "+" arriba (crea un disco o una colección,
-    /// según el scope activo). En colecciones no hay filtro de tipo ni
-    /// grid/lista: es una sola lista, no hace falta esa complejidad todavía.
-    private var floatingControls: some View {
+    /// Cápsula flotante inferior izquierda: crear (admin) y discusión
+    /// general de discografía. Separada de los controles de la derecha
+    /// porque no son de la misma familia (esos filtran/ordenan el propio
+    /// listado; estos abren algo aparte).
+    private var leftFloatingControls: some View {
         VStack(spacing: 14) {
             if isAdmin {
                 Button {
@@ -244,6 +256,28 @@ struct ReleaseListView: View {
                 }
                 .accessibilityLabel(scope == .releases ? "Nuevo disco" : "Nueva colección")
             }
+            Button {
+                showingGeneralForum = true
+            } label: {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 18))
+                    .frame(width: 24, height: 24)
+            }
+            .accessibilityLabel("Discusión general de discografía")
+        }
+        .padding(.vertical, 12)
+        .padding(.horizontal, 10)
+        .background(.regularMaterial, in: Capsule())
+        .padding(.leading, 12)
+        .padding(.bottom, 20)
+    }
+
+    /// Filtro/orden y cambio de vista, flotantes sobre el contenido cerca
+    /// del borde inferior derecho, uno encima del otro. En colecciones no
+    /// hay filtro de tipo ni grid/lista: es una sola lista, no hace falta
+    /// esa complejidad todavía.
+    private var rightFloatingControls: some View {
+        VStack(spacing: 14) {
             Button {
                 if isSearching {
                     isSearching = false

@@ -540,15 +540,22 @@ discusión real entre varias personas antes de que el admin actúe.
   cargado. `ForumThreadDetailView` muestra cabecera + cuerpo + comentarios, y un
   compositor de comentario al final (oculto si el hilo no está `.open`).
   `ForumThreadComposeView` es la hoja de crear hilo (título + `MarkdownEditorSection`).
+- **Discusión general de discografía** (7.3): en `ReleaseListView`, cápsula flotante
+  independiente en la esquina inferior **izquierda** (separada de la de buscar/
+  filtrar/vista, que sigue a la derecha — no son la misma familia de controles) con
+  el botón "+" de admin (crear disco/colección) y un icono de discusión que abre
+  `ForumThreadListView` con `entityType: .discography`, `entityId: nil` — hilos que
+  no cuelgan de ningún disco concreto.
 
 | # | Subtarea | Dónde | Estado |
 |---|---|---|---|
 | 7.1 | Modelo `Subforum`/`ForumThread`/`ForumComment` + endpoints (subforos, crear, listar/filtrar, comentar, cambiar estado) | `ommadawn-api` | ✅ hecho (8 ago 2026) |
-| 7.2 | Hilos del foro en el detalle de disco/edición (listar, crear, comentar) | app | En marcha |
-| 7.3 | Hilos generales de Discografía (sin disco concreto) | app | Pendiente |
+| 7.2 | Hilos del foro en el detalle de disco/edición (listar, crear, comentar) | app | ✅ hecho (9 ago 2026) |
+| 7.3 | Hilos generales de Discografía (sin disco concreto) | app | ✅ hecho (9 ago 2026) |
 | 7.4 | Admin: resolver/cerrar un hilo | app | Pendiente |
 | 7.5 | Pestaña Inicio con casos abiertos del foro | app | Pendiente |
-| 7.6 | Probado en simulador | app | Pendiente |
+| 7.6 | Poder agregar imágenes en el foro (hilos y comentarios) | app + API | Pendiente |
+| 7.7 | Probado en simulador | app | Pendiente |
 
 ### Backlog — Fases futuras
 
