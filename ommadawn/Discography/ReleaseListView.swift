@@ -129,12 +129,14 @@ struct ReleaseListView: View {
                 })
             }
             .sheet(isPresented: $showingGeneralForum) {
-                ForumThreadListView(
-                    store: forumStore,
-                    entityType: .discography,
-                    entityId: nil,
-                    navigationTitle: "Discusión general"
-                )
+                NavigationStack {
+                    ForumThreadListView(
+                        store: forumStore,
+                        entityType: .discography,
+                        entityId: nil,
+                        navigationTitle: "Discusión general"
+                    )
+                }
             }
     }
 

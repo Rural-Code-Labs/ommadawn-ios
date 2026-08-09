@@ -166,22 +166,26 @@ struct ReleaseDetailView: View {
         .sheet(isPresented: $showingReleaseForum, onDismiss: {
             Task { releaseThreadCounts = await loadCounts(entityType: .release, entityId: release.id) }
         }) {
-            ForumThreadListView(
-                store: forumStore,
-                entityType: .release,
-                entityId: release.id,
-                navigationTitle: "Discusión · \(release.title)"
-            )
+            NavigationStack {
+                ForumThreadListView(
+                    store: forumStore,
+                    entityType: .release,
+                    entityId: release.id,
+                    navigationTitle: "Discusión · \(release.title)"
+                )
+            }
         }
         .sheet(isPresented: $showingEditionForum, onDismiss: {
             Task { editionThreadCounts = await loadEditionForumCounts() }
         }) {
-            ForumThreadListView(
-                store: forumStore,
-                entityType: .edition,
-                entityId: selectedEdition?.id,
-                navigationTitle: "Discusión · \(editionTitle)"
-            )
+            NavigationStack {
+                ForumThreadListView(
+                    store: forumStore,
+                    entityType: .edition,
+                    entityId: selectedEdition?.id,
+                    navigationTitle: "Discusión · \(editionTitle)"
+                )
+            }
         }
         .sheet(isPresented: $showingEditionList) {
             EditionListSheet(
@@ -449,8 +453,10 @@ Button(role: .destructive) { showingDeleteEditionConfirm = true } label: {
     }
 
     private func loadCounts(entityType: ForumEntityType, entityId: Int) async -> (open: Int, total: Int)? {
-        async let open = try? forumStore.fetchThreads(entityType: entityType, entityId: entityId, status: .open).count
-        async let total = try? forumStore.fetchThreads(entityType: entityType, entityId: entityId).count
+        // Solo hace falta `.total` de la página, no los hilos en sí — limit:1
+        // para no traer más de lo necesario.
+        async let open = try? forumStore.fetchThreads(entityType: entityType, entityId: entityId, status: .open, limit: 1).total
+        async let total = try? forumStore.fetchThreads(entityType: entityType, entityId: entityId, limit: 1).total
         guard let openCount = await open, let totalCount = await total else { return nil }
         return (openCount, totalCount)
     }

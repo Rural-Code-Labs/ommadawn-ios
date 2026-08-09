@@ -558,24 +558,66 @@ discusión real entre varias personas antes de que el admin actúe.
   el contador al volver — si no, al resolver/cerrar un hilo y salir de la hoja,
   el número se quedaba con el valor cargado al entrar (no había nada que lo
   refrescara).
-- **Pestaña Inicio** (7.5, 9 ago 2026): `Home/HomeView.swift`, primera pestaña de
-  `RootTabView` (Inicio → Discografía → Tours). Pensada para crecer en tres
-  bloques:
-  1. **Novedades**: hoy con `sampleNews`, contenido de ejemplo hardcodeado en la
-     app (`DummyNews`, 3 entradas) — no hay backend de noticias todavía. Se
-     sustituye por datos reales el día que exista esa sección en la API.
-  2. **Actividad reciente del foro**: últimos 5 hilos (`ForumStore.fetchThreads()`
-     sin filtro de estado, ordenados por `updated_at` descendente) — captura
-     hilos nuevos, comentados o con cambio de estado (resuelto/cerrado) en un
-     único listado, reutilizando `ForumThreadRow(showsContext: true)` (mismo
-     componente que `ForumThreadListView`, con una línea extra de subforo +
-     tipo de entidad para no perder el contexto en un listado agregado).
-  3. **Changelog del catálogo** (futuro, sin construir): un historial de altas/
-     cambios en discos y ediciones. Necesita un campo `updated_at` nuevo en
-     `Release`/`Edition` que la API no tiene todavía — pendiente de pedirlo
-     cuando se aborde este bloque.
+- **Pestaña Inicio** (7.5, 9 ago 2026, ampliada el mismo día): `Home/HomeView.swift`,
+  primera pestaña de `RootTabView` (Inicio → Discografía → Tours). Tres bloques,
+  cada uno con su propia pantalla "ver todo":
+  1. **Novedades**: últimos 2 hilos del subforo **"Novedades"** (nuevo,
+     `admin_only = true` — solo un admin puede abrir hilos ahí; leer y comentar
+     sigue siendo de cualquiera con email verificado). "Ver todas las novedades"
+     abre `ForumThreadListView(subforumId:)` filtrado a ese subforo. Reemplaza
+     la versión inicial con noticias `DummyNews` hardcodeadas (7.5 original).
+  2. **Actividad reciente del foro**: últimos 5 hilos de cualquier subforo/
+     entidad (`ForumStore.fetchThreads(limit: 100)`, ordenados por `updated_at`
+     descendente en el cliente — la API ya devuelve "más recientes primero",
+     pero por creación, no por última actividad; si el foro crece mucho, esto
+     necesitará un parámetro de orden en la API en vez de sobre-pedir).
+     Reutiliza `ForumThreadRow(showsContext: true)` (mismo componente que
+     `ForumThreadListView`, con una línea extra de subforo + tipo de entidad).
+     "Ver todos los subforos" abre `SubforumListView` (lista los subforos,
+     entrar en uno lleva a todos sus hilos paginados).
+  3. **Changelog del catálogo**: contenido de ejemplo (`Home/ChangelogEntry.swift`,
+     `sampleChangelog`) — sin backend todavía, pendiente de un campo `updated_at`
+     nuevo en `Release`/`Edition` que la API no tiene. "Ver todo el changelog"
+     abre `ChangelogListView`, paginada **localmente** sobre el array de ejemplo
+     (botón "Cargar más" que revela más elementos del mismo array, sin llamada
+     a red — es solo para probar la interacción, no hay datos reales que traer).
   `ForumThreadRow` se expuso (dejó de ser `private`) en `ForumThreadListView.swift`
-  para poder reutilizarlo aquí sin duplicar la fila.
+  para poder reutilizarlo en el bloque de actividad.
+- **Subforo "Novedades" + paginación del foro** (9 ago 2026, cambio de contrato):
+  - **`Subforum` gana `admin_only: Bool`**, expuesto en `SubforumRead` — permite
+    a la app ocultar/deshabilitar el botón de crear hilo sin esperar a que el
+    servidor lo rechace. Seed: `Subforum(name="Novedades", icon="megaphone",
+    position=1, admin_only=true)`, junto al ya existente `Subforum(name=
+    "Discusiones", position=0, admin_only=false)`.
+  - **`POST /forum/threads` gana un segundo motivo de `403`**: además de
+    `email_not_verified` (código corto), un subforo `admin_only` rechaza a
+    quien no es admin con un `detail` en prosa ("Se requieren permisos de
+    administrador") — distinguibles por el propio `detail`, mismo criterio que
+    el resto de la app. `ForumError` gana `.subforumRestricted` junto a
+    `.emailNotVerified`, ambos mapeados desde el mismo case `.forbidden` del
+    Output generado inspeccionando `detail`.
+  - **`GET /forum/threads` pasa a paginar**: `limit` (por defecto 20, máximo
+    100) y `offset`, combinados con los filtros ya existentes. **Cambio de
+    forma de la respuesta** (de array plano a objeto) — decisión deliberada
+    dentro de `/v1` sin versionar, porque el foro no tiene más clientes
+    todavía: `ThreadListPage { items: [ThreadListRead], total: int }`, alias
+    `ForumThreadPage` en `Models.swift`. `total` es el número de hilos que
+    cumplen el filtro sin paginar (no el tamaño de `items`), útil tanto para
+    "Cargar más" como para contar sin traer los hilos (`loadCounts` en
+    `ReleaseDetailView` ahora pide `limit: 1` y lee solo `.total`, más barato
+    que traer todo y contar `.count` en el cliente).
+  - **`ForumThreadListView` gana paginación real**: `pageSize = 20`, botón
+    "Cargar más" al final de la lista mientras `threads.count < total`. También
+    gana un `subforumId: Int?` explícito (usado por `SubforumListView` al
+    entrar en un subforo concreto) y `showsCloseButton: Bool` (`false` cuando
+    se empuja dentro de un `NavigationStack` ya existente en vez de presentarse
+    como hoja propia) — dejó de envolverse en su propio `NavigationStack`
+    internamente; cada llamador que la presenta como `.sheet` la envuelve él
+    mismo (`ReleaseDetailView`, `ReleaseListView`, `HomeView`).
+  - **`SubforumListView.swift`** (nuevo, `Forum/`): lista los subforos
+    (`fetchSubforums`), cada fila con icono/nombre/descripción; entrar en uno
+    empuja `ForumThreadListView(subforumId:showsCloseButton: false)` dentro del
+    mismo `NavigationStack` (no como hoja aparte).
 - **Discusión general de discografía** (7.3): en `ReleaseListView`, cápsula flotante
   independiente en la esquina inferior **izquierda** (separada de la de buscar/
   filtrar/vista, que sigue a la derecha — no son la misma familia de controles) con
@@ -824,14 +866,17 @@ ommadawn/
 │   │   ├── CollectionListView.swift     # listado de colecciones + CollectionFormView (crear/editar)
 │   │   ├── CollectionDetailView.swift
 │   │   └── CollectionTagPickerView.swift # multi-selección de colecciones para una edición
-│   ├── Home/                       # Fase 7: pestaña Inicio (novedades + actividad del foro)
-│   │   └── HomeView.swift
+│   ├── Home/                       # Fase 7: pestaña Inicio (novedades + actividad + changelog)
+│   │   ├── HomeView.swift
+│   │   ├── ChangelogEntry.swift          # modelo + sampleChangelog (contenido de ejemplo)
+│   │   └── ChangelogListView.swift       # "ver todo" del changelog, paginado localmente
 │   ├── Forum/                     # Fase 7: foro de discusión (subforos + hilos + comentarios)
 │   │   ├── ForumStore.swift
 │   │   ├── Forum+Presentation.swift      # displayName/tintColor de estado y tipo de entidad
-│   │   ├── ForumThreadListView.swift     # lista de hilos de un subforo/entidad + crear
+│   │   ├── ForumThreadListView.swift     # lista paginada de hilos de un subforo/entidad + crear
 │   │   ├── ForumThreadDetailView.swift   # hilo + comentarios + compositor de comentario
-│   │   └── ForumThreadComposeView.swift  # hoja de crear hilo
+│   │   ├── ForumThreadComposeView.swift  # hoja de crear hilo
+│   │   └── SubforumListView.swift        # explorar subforos → hilos paginados de cada uno
 │   ├── Shared/                   # Componentes reutilizables entre dominios
 │   │   ├── Country.swift              # modelo Country + NSLocale.isoCountryCodes + extraCodes
 │   │   ├── CountryPickerView.swift    # hoja de selección de país con frecuentes + buscador

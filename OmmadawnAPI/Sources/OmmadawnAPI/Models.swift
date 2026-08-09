@@ -58,6 +58,9 @@ public typealias ForumEntityType = Components.Schemas.ForumEntityType
 public typealias ForumThreadStatus = Components.Schemas.ThreadStatus
 /// Un hilo del foro tal como aparece en el listado — sin cuerpo ni comentarios.
 public typealias ForumThreadSummary = Components.Schemas.ThreadListRead
+/// Página de resultados de `GET /forum/threads`: `items` + `total` (el
+/// número de hilos que cumplen el filtro sin paginar, no el tamaño de `items`).
+public typealias ForumThreadPage = Components.Schemas.ThreadListPage
 /// El detalle de un hilo del foro, con todos sus comentarios.
 public typealias ForumThreadDetail = Components.Schemas.ThreadDetailRead
 /// Un comentario de un hilo del foro.

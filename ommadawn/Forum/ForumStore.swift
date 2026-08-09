@@ -15,6 +15,7 @@ enum ForumError: Error {
     case notFound
     case sessionExpired    // 401
     case emailNotVerified  // 403 al crear un hilo o comentar — falta verificar el email
+    case subforumRestricted // 403 al crear un hilo — el subforo es admin_only y no eres admin
     case forbidden         // 403 al cambiar el estado — no es admin
     case invalidData       // 422 — p. ej. entity_id no corresponde a ningún disco/edición
     case unexpected(Int)
@@ -41,18 +42,22 @@ struct ForumStore {
         catch { throw ForumError.network(error) }
     }
 
-    /// Lista hilos, más recientes primero. `subforumId` filtra por subforo;
-    /// `entityType`+`entityId` filtran por disco/edición concreto; `status`
-    /// filtra por estado (p. ej. `.open` para la cola de la pestaña Inicio).
+    /// Lista hilos paginados, más recientes primero. `subforumId` filtra por
+    /// subforo; `entityType`+`entityId` filtran por disco/edición concreto;
+    /// `status` filtra por estado (p. ej. `.open` para la cola de Inicio).
+    /// `limit`/`offset` paginan; `total` en la respuesta es el número de
+    /// hilos que cumplen el filtro sin paginar.
     func fetchThreads(
         subforumId: Int? = nil,
         entityType: ForumEntityType? = nil,
         entityId: Int? = nil,
-        status: ForumThreadStatus? = nil
-    ) async throws -> [ForumThreadSummary] {
+        status: ForumThreadStatus? = nil,
+        limit: Int? = nil,
+        offset: Int? = nil
+    ) async throws -> ForumThreadPage {
         do {
             let output = try await client.list_threads_api_v1_forum_threads_get(
-                .init(query: .init(subforum_id: subforumId, entity_type: entityType, entity_id: entityId, status: status))
+                .init(query: .init(subforum_id: subforumId, entity_type: entityType, entity_id: entityId, status: status, limit: limit, offset: offset))
             )
             switch output {
             case .ok(let r): return try r.body.json
@@ -98,7 +103,9 @@ struct ForumStore {
             switch output {
             case .created(let r): return try r.body.json
             case .unauthorized: throw ForumError.sessionExpired
-            case .forbidden: throw ForumError.emailNotVerified
+            case .forbidden(let r):
+                let detail = (try? r.body.json.detail) ?? ""
+                throw detail == "email_not_verified" ? ForumError.emailNotVerified : ForumError.subforumRestricted
             case .notFound: throw ForumError.notFound
             case .unprocessableContent: throw ForumError.invalidData
             case .undocumented(let c, _): throw ForumError.unexpected(c)

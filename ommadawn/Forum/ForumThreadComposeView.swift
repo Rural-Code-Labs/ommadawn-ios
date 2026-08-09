@@ -101,6 +101,8 @@ struct ForumThreadComposeView: View {
         } catch ForumError.emailNotVerified {
             errorMessage = "Verifica tu email para poder participar en el foro."
             showingVerifyEmail = true
+        } catch ForumError.subforumRestricted {
+            errorMessage = "Solo un administrador puede abrir hilos en este subforo."
         } catch ForumError.sessionExpired {
             errorMessage = "Tu sesión ha caducado. Vuelve a entrar e inténtalo de nuevo."
         } catch ForumError.invalidData {

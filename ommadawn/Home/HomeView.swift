@@ -2,62 +2,55 @@
 //  HomeView.swift
 //  ommadawn
 //
-//  Pestaña Inicio (Fase 7.5). Tres bloques pensados para ir creciendo:
-//  noticias (hoy con contenido de ejemplo — no hay backend de noticias
-//  todavía), actividad reciente del foro (últimos hilos con creación,
-//  comentario o cambio de estado) y, en el futuro, un changelog del catálogo
-//  (pendiente de un campo `updated_at` en Release/Edition que la API no
-//  tiene aún — ver CLAUDE.md).
+//  Pestaña Inicio (Fase 7.5). Tres bloques, cada uno con su propia pantalla
+//  "ver todo":
+//  - Novedades: últimos 2 hilos del subforo "Novedades" (solo admins pueden
+//    abrir hilos ahí — pendiente de sembrar ese subforo en la API, ver
+//    CLAUDE.md). "Ver todas" abre ForumThreadListView filtrado a ese subforo.
+//  - Actividad reciente del foro: últimos 5 hilos de cualquier subforo/
+//    entidad. "Ver todo" abre SubforumListView (explorar por subforo).
+//  - Changelog: contenido de ejemplo (sin backend todavía — pendiente de un
+//    `updated_at` en Release/Edition). "Ver todo" abre ChangelogListView.
 //
 
 import SwiftUI
 import OmmadawnAPI
 
-/// Contenido de ejemplo: no hay backend de noticias todavía. Se sustituye
-/// por datos reales el día que exista esa sección en la API.
-private struct DummyNews: Identifiable {
-    let id = UUID()
-    let title: String
-    let date: Date
-    let summary: String
-}
-
-private let sampleNews: [DummyNews] = [
-    DummyNews(
-        title: "Bienvenido al foro de Ommadawn",
-        date: Calendar.current.date(byAdding: .day, value: -1, to: .now) ?? .now,
-        summary: "Ya puedes proponer cambios y discutirlos en cualquier disco, edición o de forma general."
-    ),
-    DummyNews(
-        title: "Colecciones de ediciones",
-        date: Calendar.current.date(byAdding: .day, value: -4, to: .now) ?? .now,
-        summary: "Agrupa ediciones de discos distintos bajo un nombre común, como \"Remasterizaciones HDCD\"."
-    ),
-    DummyNews(
-        title: "Login con Google",
-        date: Calendar.current.date(byAdding: .day, value: -9, to: .now) ?? .now,
-        summary: "Ahora puedes entrar y vincular tu cuenta de Google desde el perfil."
-    ),
-]
-
 struct HomeView: View {
     @Environment(AuthSession.self) private var session
 
+    @State private var novedadesSubforumId: Int?
+    @State private var novedadesThreads: [ForumThreadSummary] = []
     @State private var recentThreads: [ForumThreadSummary] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
+
+    @State private var showingNovedades = false
+    @State private var showingSubforums = false
+    @State private var showingChangelog = false
 
     private var forumStore: ForumStore { ForumStore(client: session.client) }
 
     var body: some View {
         List {
-            Section("Novedades") {
-                ForEach(sampleNews) { news in
-                    newsRow(news)
+            Section {
+                if novedadesThreads.isEmpty {
+                    Text(novedadesSubforumId == nil ? "Todavía no hay subforo de novedades." : "Sin novedades todavía.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(novedadesThreads) { thread in
+                        NavigationLink(value: thread) {
+                            ForumThreadRow(thread: thread)
+                        }
+                    }
                 }
+                Button("Ver todas las novedades") { showingNovedades = true }
+                    .disabled(novedadesSubforumId == nil)
+            } header: {
+                Text("Novedades")
             }
 
-            Section("Actividad reciente del foro") {
+            Section {
                 if isLoading && recentThreads.isEmpty {
                     ProgressView()
                         .frame(maxWidth: .infinity)
@@ -74,6 +67,18 @@ struct HomeView: View {
                         }
                     }
                 }
+                Button("Ver todos los subforos") { showingSubforums = true }
+            } header: {
+                Text("Actividad reciente del foro")
+            }
+
+            Section {
+                ForEach(sampleChangelog.prefix(3)) { entry in
+                    changelogRow(entry)
+                }
+                Button("Ver todo el changelog") { showingChangelog = true }
+            } header: {
+                Text("Changelog")
             }
         }
         .listStyle(.insetGrouped)
@@ -82,16 +87,33 @@ struct HomeView: View {
         .navigationDestination(for: ForumThreadSummary.self) { thread in
             ForumThreadDetailView(threadID: thread.id, store: forumStore)
         }
+        .sheet(isPresented: $showingNovedades) {
+            if let novedadesSubforumId {
+                NavigationStack {
+                    ForumThreadListView(
+                        store: forumStore,
+                        subforumId: novedadesSubforumId,
+                        navigationTitle: "Novedades"
+                    )
+                }
+            }
+        }
+        .sheet(isPresented: $showingSubforums) {
+            SubforumListView(store: forumStore)
+        }
+        .sheet(isPresented: $showingChangelog) {
+            ChangelogListView()
+        }
     }
 
-    private func newsRow(_ news: DummyNews) -> some View {
+    private func changelogRow(_ entry: ChangelogEntry) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(news.title)
+            Text(entry.title)
                 .font(.body.weight(.semibold))
-            Text(news.summary)
+            Text(entry.detail)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
-            Text(news.date.formatted(date: .abbreviated, time: .omitted))
+            Text(entry.date.formatted(date: .abbreviated, time: .omitted))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
         }
@@ -103,8 +125,23 @@ struct HomeView: View {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            let threads = try await forumStore.fetchThreads()
-            recentThreads = Array(threads.sorted { $0.updated_at > $1.updated_at }.prefix(5))
+            let subforums = try await forumStore.fetchSubforums()
+            // limit alto para poder ordenar por `updated_at` en el cliente
+            // (la API ya devuelve "más recientes primero", pero por
+            // creación, no por última actividad) — de sobra mientras el
+            // foro tenga pocos hilos; si crece, esto necesitará un
+            // parámetro de orden en la API en vez de traer de más.
+            let recentPage = try await forumStore.fetchThreads(limit: 100)
+            recentThreads = Array(recentPage.items.sorted { $0.updated_at > $1.updated_at }.prefix(5))
+
+            if let novedades = subforums.first(where: { $0.name == "Novedades" }) {
+                novedadesSubforumId = novedades.id
+                let novedadesPage = try await forumStore.fetchThreads(subforumId: novedades.id, limit: 2)
+                novedadesThreads = novedadesPage.items
+            } else {
+                novedadesSubforumId = nil
+                novedadesThreads = []
+            }
         } catch {
             errorMessage = "Comprueba tu conexión e inténtalo de nuevo."
         }
