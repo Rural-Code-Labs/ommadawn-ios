@@ -25,6 +25,13 @@ struct RootTabView: View {
 
             TabView {
                 NavigationStack {
+                    HomeView()
+                }
+                .tabItem {
+                    Label("Inicio", systemImage: "house")
+                }
+
+                NavigationStack {
                     ReleaseListView()
                 }
                 .tabItem {

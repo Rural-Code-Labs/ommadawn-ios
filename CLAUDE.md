@@ -558,6 +558,24 @@ discusión real entre varias personas antes de que el admin actúe.
   el contador al volver — si no, al resolver/cerrar un hilo y salir de la hoja,
   el número se quedaba con el valor cargado al entrar (no había nada que lo
   refrescara).
+- **Pestaña Inicio** (7.5, 9 ago 2026): `Home/HomeView.swift`, primera pestaña de
+  `RootTabView` (Inicio → Discografía → Tours). Pensada para crecer en tres
+  bloques:
+  1. **Novedades**: hoy con `sampleNews`, contenido de ejemplo hardcodeado en la
+     app (`DummyNews`, 3 entradas) — no hay backend de noticias todavía. Se
+     sustituye por datos reales el día que exista esa sección en la API.
+  2. **Actividad reciente del foro**: últimos 5 hilos (`ForumStore.fetchThreads()`
+     sin filtro de estado, ordenados por `updated_at` descendente) — captura
+     hilos nuevos, comentados o con cambio de estado (resuelto/cerrado) en un
+     único listado, reutilizando `ForumThreadRow(showsContext: true)` (mismo
+     componente que `ForumThreadListView`, con una línea extra de subforo +
+     tipo de entidad para no perder el contexto en un listado agregado).
+  3. **Changelog del catálogo** (futuro, sin construir): un historial de altas/
+     cambios en discos y ediciones. Necesita un campo `updated_at` nuevo en
+     `Release`/`Edition` que la API no tiene todavía — pendiente de pedirlo
+     cuando se aborde este bloque.
+  `ForumThreadRow` se expuso (dejó de ser `private`) en `ForumThreadListView.swift`
+  para poder reutilizarlo aquí sin duplicar la fila.
 - **Discusión general de discografía** (7.3): en `ReleaseListView`, cápsula flotante
   independiente en la esquina inferior **izquierda** (separada de la de buscar/
   filtrar/vista, que sigue a la derecha — no son la misma familia de controles) con
@@ -571,7 +589,7 @@ discusión real entre varias personas antes de que el admin actúe.
 | 7.2 | Hilos del foro en el detalle de disco/edición (listar, crear, comentar) | app | ✅ hecho (9 ago 2026) |
 | 7.3 | Hilos generales de Discografía (sin disco concreto) | app | ✅ hecho (9 ago 2026) |
 | 7.4 | Admin: resolver/cerrar un hilo | app | ✅ hecho (9 ago 2026) |
-| 7.5 | Pestaña Inicio con casos abiertos del foro | app | Pendiente |
+| 7.5 | Pestaña Inicio con casos abiertos del foro | app | ✅ hecho (9 ago 2026) |
 | 7.6 | Poder agregar imágenes en el foro (hilos y comentarios) | app + API | Pendiente |
 | 7.7 | Probado en simulador | app | Pendiente |
 
@@ -806,6 +824,8 @@ ommadawn/
 │   │   ├── CollectionListView.swift     # listado de colecciones + CollectionFormView (crear/editar)
 │   │   ├── CollectionDetailView.swift
 │   │   └── CollectionTagPickerView.swift # multi-selección de colecciones para una edición
+│   ├── Home/                       # Fase 7: pestaña Inicio (novedades + actividad del foro)
+│   │   └── HomeView.swift
 │   ├── Forum/                     # Fase 7: foro de discusión (subforos + hilos + comentarios)
 │   │   ├── ForumStore.swift
 │   │   ├── Forum+Presentation.swift      # displayName/tintColor de estado y tipo de entidad

@@ -125,14 +125,24 @@ struct ForumThreadListView: View {
     }
 }
 
-private struct ForumThreadRow: View {
+/// `showsContext` añade una línea con el subforo y a qué se refiere el hilo
+/// (disco/edición/discografía) — útil en listados agregados (Inicio) donde,
+/// a diferencia de `ForumThreadListView` (ya filtrado a una entidad), no es
+/// obvio de dónde viene cada hilo.
+struct ForumThreadRow: View {
     let thread: ForumThreadSummary
+    var showsContext = false
 
     var body: some View {
         HStack(alignment: .top) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(thread.title)
                     .font(.body)
+                if showsContext {
+                    Text(contextLabel)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
                 Text("\(thread.author_username) · \(thread.created_at.formatted(date: .abbreviated, time: .omitted))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -153,5 +163,10 @@ private struct ForumThreadRow: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    private var contextLabel: String {
+        guard let entityType = thread.entity_type else { return thread.subforum_name }
+        return "\(thread.subforum_name) · \(entityType.displayName)"
     }
 }
