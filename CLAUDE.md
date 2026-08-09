@@ -632,8 +632,9 @@ discusión real entre varias personas antes de que el admin actúe.
 | 7.3 | Hilos generales de Discografía (sin disco concreto) | app | ✅ hecho (9 ago 2026) |
 | 7.4 | Admin: resolver/cerrar un hilo | app | ✅ hecho (9 ago 2026) |
 | 7.5 | Pestaña Inicio con casos abiertos del foro | app | ✅ hecho (9 ago 2026) |
-| 7.6 | Poder agregar imágenes en el foro (hilos y comentarios) | app + API | Pendiente |
-| 7.7 | Probado en simulador | app | Pendiente |
+| 7.6 | Admin: gestión de subforos (orden, icono, nombre, crear, borrar) | app + API | En marcha |
+| 7.7 | Poder agregar imágenes en el foro (hilos y comentarios) | app + API | Pendiente |
+| 7.8 | Probado en simulador | app | Pendiente |
 
 ### Backlog — Fases futuras
 
